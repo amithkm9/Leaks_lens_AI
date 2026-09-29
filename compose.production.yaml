@@ -1,0 +1,36 @@
+services:
+  api:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      ALLOWED_ORIGIN: https://${DOMAIN:?Set DOMAIN}
+      FIXTURE_ORIGIN: ''
+  worker:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      FIXTURE_ORIGIN: ''
+  migrate:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      FIXTURE_ORIGIN: ''
+  retention:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      FIXTURE_ORIGIN: ''
+  proxy:
+    image: caddy:2.10-alpine
+    ports: ['80:80', '443:443']
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN}
+    volumes:
+      - ./scripts/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [frontend]
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:
