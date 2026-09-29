@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Dune Systems
+customer_email,region
+contact@company3.example.test,fictional region
+Synthetic formatting revision. Generated only for automated evaluation.

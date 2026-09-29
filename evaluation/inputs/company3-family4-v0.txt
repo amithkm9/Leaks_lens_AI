@@ -1,0 +1,4 @@
+SYNTHETIC confidential operations
+Account owner: Dune Systems
+Contact: operator@company3.example.test
+Internal reference: REF-3-APPROVED

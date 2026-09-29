@@ -1,0 +1,4 @@
+SYNTHETIC supplier inventory
+Approved client reference: REF-4-APPROVED
+api_key=synthetic-nonfunctional-4-indirect-456789
+Synthetic revision: columns renamed.

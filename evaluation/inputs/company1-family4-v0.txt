@@ -1,0 +1,4 @@
+SYNTHETIC confidential operations
+Account owner: Birch Optics
+Contact: operator@company1.example.test
+Internal reference: REF-1-APPROVED

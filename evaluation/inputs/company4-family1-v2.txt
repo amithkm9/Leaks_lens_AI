@@ -1,0 +1,4 @@
+SYNTHETIC customer export Elm Circuits
+company,email,phone
+Elm Circuits,person@company4.example.test,+33 6 12 34 56 78
+Synthetic revision: columns renamed.

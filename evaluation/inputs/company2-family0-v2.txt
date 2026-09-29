@@ -1,0 +1,4 @@
+# SYNTHETIC configuration
+# Cobalt Maritime — company2.example.test
+api_key=synthetic-nonfunctional-2-alpha-123456
+Synthetic revision: columns renamed.

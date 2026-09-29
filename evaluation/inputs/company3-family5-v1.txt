@@ -1,0 +1,3 @@
+SYNTHETIC supplier inventory
+Approved client reference: REF-3-APPROVED
+api_key=synthetic-nonfunctional-3-indirect-456789

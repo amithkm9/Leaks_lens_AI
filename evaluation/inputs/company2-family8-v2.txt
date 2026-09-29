@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Cobalt Maritime
+contact_address,region
+contact@company2.example.test,fictional region
+Synthetic revision: columns renamed.

@@ -1,0 +1,5 @@
+SYNTHETIC confidential operations
+Account owner: Aster Machines
+Contact: operator@company0.example.test
+Internal reference: REF-0-APPROVED
+Synthetic formatting revision. Generated only for automated evaluation.

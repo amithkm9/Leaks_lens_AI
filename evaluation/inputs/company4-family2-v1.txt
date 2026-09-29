@@ -1,0 +1,2 @@
+SYNTHETIC public brochure
+Elm Circuits manufactures precision equipment. Visit company4.example.test for public product information.

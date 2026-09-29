@@ -1,0 +1,3 @@
+SYNTHETIC contact table for Elm Circuits
+customer_email,region
+contact@company4.example.test,fictional region

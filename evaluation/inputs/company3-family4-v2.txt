@@ -1,0 +1,5 @@
+SYNTHETIC confidential operations
+Department owner: Dune Systems
+Contact: operator@company3.example.test
+Internal reference: REF-3-APPROVED
+Synthetic revision: columns renamed.

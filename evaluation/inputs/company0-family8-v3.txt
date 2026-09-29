@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Aster Machines
+customer_email,region
+contact@company0.example.test,fictional region
+Synthetic formatting revision. Generated only for automated evaluation.

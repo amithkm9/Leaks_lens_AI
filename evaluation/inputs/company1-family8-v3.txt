@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Birch Optics
+customer_email,region
+contact@company1.example.test,fictional region
+Synthetic formatting revision. Generated only for automated evaluation.

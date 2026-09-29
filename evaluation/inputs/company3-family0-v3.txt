@@ -1,0 +1,4 @@
+# SYNTHETIC configuration
+# Dune Systems — company3.example.test
+api_key=synthetic-nonfunctional-3-alpha-123456
+Synthetic formatting revision. Generated only for automated evaluation.

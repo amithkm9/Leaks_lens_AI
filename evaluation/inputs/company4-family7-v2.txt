@@ -1,0 +1,2 @@
+{"synthetic": true, "organization": "Elm Circuits", "domain": "company4.example.test", "api_key": "synthetic-nonfunctional-4-json-abcdef"}
+Synthetic revision: columns renamed.

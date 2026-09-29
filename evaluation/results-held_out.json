@@ -1,0 +1,85 @@
+{
+  "dataset_version": "synthetic-v1-seed-20260928",
+  "manifest_sha256": "af99bfa63be592a69520fb004bf37835a293f641f0db8c5f37c864fd57cf2201",
+  "timestamp": "2026-09-29T06:22:05.274615+00:00",
+  "split": "held_out",
+  "sample_size": 60,
+  "synthetic": true,
+  "mode": "offline",
+  "configuration": {
+    "custom": "1.0",
+    "presidio": "2.2.364",
+    "gitleaks": true,
+    "pii_entities": [
+      "EMAIL_ADDRESS",
+      "PHONE_NUMBER",
+      "CREDIT_CARD"
+    ],
+    "ocr": false
+  },
+  "A_detectors_only": {
+    "detection": {
+      "tp": 40,
+      "fp": 0,
+      "fn": 0,
+      "tn": 20,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "unit": "document",
+      "n": 60
+    },
+    "attribution": null
+  },
+  "B_detectors_and_rules": {
+    "detection": {
+      "tp": 40,
+      "fp": 0,
+      "fn": 0,
+      "tn": 20,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "unit": "document",
+      "n": 60
+    },
+    "attribution": {
+      "correct_emitted": 40,
+      "emitted": 40,
+      "precision": 1.0,
+      "coverage": 0.6666666666666666,
+      "recall_on_attributable_documents": 1.0,
+      "attributable_documents": 40
+    }
+  },
+  "C_live_agent": {
+    "status": "not_run",
+    "reason": "Requires an explicitly enabled provider and separate live evaluation; no offline substitution."
+  },
+  "duplicate_grouping": {
+    "tp": 35,
+    "fp": 110,
+    "fn": 55,
+    "tn": 1570,
+    "precision": 0.2413793103448276,
+    "recall": 0.3888888888888889,
+    "f1": 0.2978723404255319,
+    "unit": "unordered document pair",
+    "n": 1770,
+    "note": "Template groups define related variants. Redaction can create false-positive similarity between different companies; links remain candidates."
+  },
+  "latency_ms": {
+    "median": 326.3016669952776,
+    "p95": 368.417292018421,
+    "unit": "one detector + rule evaluation, excludes collection, database and queue"
+  },
+  "citation_validity": null,
+  "sampled_claim_support": null,
+  "tool_failure_rate": null,
+  "model_usage": null,
+  "cost_usd": null,
+  "unavailable_metrics_reason": "No model or tool calls in these detector/rule baselines. Semantic support requires independent manual annotation.",
+  "errors": [],
+  "coverage_warnings": [],
+  "failures": []
+}

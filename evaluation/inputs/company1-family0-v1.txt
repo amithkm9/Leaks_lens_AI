@@ -1,0 +1,3 @@
+# SYNTHETIC configuration
+# Birch Optics — company1.example.test
+api_key=synthetic-nonfunctional-1-alpha-123456

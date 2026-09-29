@@ -1,0 +1,10 @@
+{
+  "version": "synthetic-v1-seed-20260928",
+  "manifest_sha256": "af99bfa63be592a69520fb004bf37835a293f641f0db8c5f37c864fd57cf2201",
+  "split_unit": "template family; all companies and variants of a family share the split",
+  "held_out_families": [
+    7,
+    8,
+    9
+  ]
+}

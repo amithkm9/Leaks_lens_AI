@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Dune Systems
+contact_address,region
+contact@company3.example.test,fictional region
+Synthetic revision: columns renamed.

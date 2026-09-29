@@ -1,0 +1,4 @@
+SYNTHETIC confidential operations
+Account owner: Elm Circuits
+Contact: operator@company4.example.test
+Internal reference: REF-4-APPROVED

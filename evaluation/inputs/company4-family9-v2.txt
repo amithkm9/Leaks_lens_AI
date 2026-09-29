@@ -1,0 +1,2 @@
+SYNTHETIC unrelated public weather note. Clear skies and mild winds tomorrow.
+Synthetic revision: columns renamed.

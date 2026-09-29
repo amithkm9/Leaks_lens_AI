@@ -1,0 +1,3 @@
+# SYNTHETIC configuration
+# Aster Machines — company0.example.test
+api_key=synthetic-nonfunctional-0-alpha-123456

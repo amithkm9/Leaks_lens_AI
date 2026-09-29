@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Birch Optics
+contact_address,region
+contact@company1.example.test,fictional region
+Synthetic revision: columns renamed.

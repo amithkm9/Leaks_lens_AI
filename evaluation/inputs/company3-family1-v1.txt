@@ -1,0 +1,3 @@
+SYNTHETIC customer export Dune Systems
+company,email,phone
+Dune Systems,person@company3.example.test,+33 6 12 34 56 78

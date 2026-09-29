@@ -1,0 +1,5 @@
+SYNTHETIC confidential operations
+Department owner: Cobalt Maritime
+Contact: operator@company2.example.test
+Internal reference: REF-2-APPROVED
+Synthetic revision: columns renamed.

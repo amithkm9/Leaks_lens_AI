@@ -1,0 +1,1 @@
+{"synthetic": true, "organization": "Birch Optics", "domain": "company1.example.test", "api_key": "synthetic-nonfunctional-1-json-abcdef"}

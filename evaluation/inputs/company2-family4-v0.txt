@@ -1,0 +1,4 @@
+SYNTHETIC confidential operations
+Account owner: Cobalt Maritime
+Contact: operator@company2.example.test
+Internal reference: REF-2-APPROVED

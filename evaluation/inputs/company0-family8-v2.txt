@@ -1,0 +1,4 @@
+SYNTHETIC contact table for Aster Machines
+contact_address,region
+contact@company0.example.test,fictional region
+Synthetic revision: columns renamed.

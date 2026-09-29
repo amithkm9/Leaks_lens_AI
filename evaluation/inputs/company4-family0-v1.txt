@@ -1,0 +1,3 @@
+# SYNTHETIC configuration
+# Elm Circuits — company4.example.test
+api_key=synthetic-nonfunctional-4-alpha-123456

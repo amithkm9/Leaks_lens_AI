@@ -1,0 +1,4 @@
+SYNTHETIC placeholder documentation
+api_key=changeme
+Replace this placeholder before running.
+Synthetic revision: columns renamed.

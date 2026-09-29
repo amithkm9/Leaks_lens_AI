@@ -1,0 +1,4 @@
+SYNTHETIC customer export Cobalt Maritime
+company,email,phone
+Cobalt Maritime,person@company2.example.test,+33 6 12 34 56 78
+Synthetic formatting revision. Generated only for automated evaluation.

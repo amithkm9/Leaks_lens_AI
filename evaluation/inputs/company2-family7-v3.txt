@@ -1,0 +1,2 @@
+{"synthetic": true, "organization": "Cobalt Maritime", "domain": "company2.example.test", "api_key": "synthetic-nonfunctional-2-json-abcdef"}
+Synthetic formatting revision. Generated only for automated evaluation.

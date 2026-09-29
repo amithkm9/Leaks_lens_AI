@@ -1,0 +1,2 @@
+{"synthetic": true, "organization": "Aster Machines", "domain": "company0.example.test", "api_key": "synthetic-nonfunctional-0-json-abcdef"}
+Synthetic formatting revision. Generated only for automated evaluation.
