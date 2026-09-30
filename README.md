@@ -1,27 +1,62 @@
 # LeakLens AI
 
-An evidence-driven data exposure investigation application. Collect from explicitly authorized sources, detect suspected secrets and selected personal-data entities, review redacted evidence, investigate organization associations, record decisions, and recheck source observations.
+**Turn authorized documents and repositories into redacted, reviewable data-exposure cases.**
 
-Independent LeakLens branding; no affiliation with CybelAngel. This is a portfolio-scale engineering project, not an enterprise coverage claim. The demonstration story and presentation assets are intentionally deferred at the owner's request.
+LeakLens detects suspected secrets and selected personal data, connects findings to organization evidence, and helps an analyst investigate, record a decision, and recheck the source. It runs without a paid AI key; a bounded AI investigation is optional.
 
-## Start locally
+[Quick start](#quick-start) · [Architecture](#architecture) · [Repository map](#repository-map) · [Verification](#verification) · [Documentation](#documentation)
 
-Prerequisites: Python **3.12**, [uv](https://docs.astral.sh/uv/), Node **22+**, npm, and Git **2.50+**. Apple Silicon and Linux are supported. The application does not require a paid model key.
+## The whole project in one picture
+
+```mermaid
+flowchart TD
+    U["Upload PDF, CSV, JSON, text or code"] --> S["Collect and parse within limits"]
+    G["Authorized Git repository"] --> S
+    H["Approved HTTP source"] --> S
+    S --> D["Detect and redact<br/>Save findings and evidence locations"]
+    D --> A["Match organization signals<br/>and related documents"]
+    A -->|"When findings exist"| I["Incident with policy-based priority"]
+    I --> X["Optional bounded AI investigation"]
+    I --> V["Analyst reviews evidence"]
+    X --> V
+    V --> O["Record decision · Export report · Recheck source"]
+    classDef source fill:#eff6ff,stroke:#2563eb,color:#172554
+    classDef ai fill:#faf5ff,stroke:#9333ea,color:#3b0764
+    classDef outcome fill:#ecfdf5,stroke:#059669,color:#064e3b
+    class U,G,H source
+    class X ai
+    class V,O outcome
+```
+
+| Analyst action | What the app provides |
+|---|---|
+| Define an organization | Approved names, domains, aliases, reference IDs and asset importance |
+| Add an authorized source | Uploads, local Git, HTTPS Git or constrained HTTP collection |
+| Scan | Background progress, cancellation, retry and explicit coverage warnings |
+| Inspect an incident | Redacted excerpts, line locations, attribution signals and priority reasons |
+| Investigate | Deterministic offline summary or optional live agent with observable tool calls |
+| Decide and follow up | Audited review history, priority overrides, redacted JSON, browser printing and manual rechecks |
+
+## Quick start
+
+Choose **local development** for the simplest start, or **Docker Compose** for PostgreSQL and a durable job queue.
+
+### Option A — local development
+
+Prerequisites: Python **3.12**, [uv](https://docs.astral.sh/uv/), Node **22+**, npm and Git **2.50+**. Supported environments: Apple Silicon and Linux.
 
 ```sh
-make setup       # install locked dependencies, generate private configuration, migrate SQLite
-make detectors   # install checksum-verified Gitleaks 8.30.1 locally
-make user        # choose an analyst email and a password, entered without echo
+make setup       # install locked dependencies, create private config, migrate SQLite
+make detectors   # install checksum-verified Gitleaks 8.30.1
+make user        # choose your analyst email and password
 make dev
 ```
 
-Open **http://localhost:5173**. There is no shipped password and no preloaded demonstration data. Configure organizations under Settings, then upload a document or configure a source. Local repositories must be below `.data/repos` (or the configured `LOCAL_REPO_ROOT`). Existing files and `.env` are preserved by setup.
+Open **http://localhost:5173**. Setup preserves existing `.env` files. Local Git repositories must be under `.data/repos`, unless `LOCAL_REPO_ROOT` is configured otherwise.
 
-`make dev` exposes local servers on loopback. A single background thread provides an explicitly local alternative to Redis/RQ. SQLite is for development and tests only. Run one local API process. Use Compose for PostgreSQL and a durable queue.
+### Option B — Docker Compose
 
-## PostgreSQL + Redis
-
-Install and start Docker Desktop on macOS, or Docker Engine with Compose v2 on Linux.
+Prerequisites: Python 3, plus a running Docker Desktop or Docker Engine with Compose v2.
 
 ```sh
 python3 scripts/setup.py
@@ -29,54 +64,254 @@ make compose-up
 make compose-user
 ```
 
-Open **http://127.0.0.1:8080**. Use this exact IPv4 address: `localhost` can resolve to a different IPv6 service already running on your computer. Only the frontend port is bound to the host, on loopback. PostgreSQL, Redis, API, worker, and MCP stay internal. The same code and migrations run in local and Docker modes. Compose uses a separate persistent database from the local SQLite workspace. `docker compose stop` stops the app while preserving volumes.
+Open **http://127.0.0.1:8080** using this exact IPv4 address. Only the frontend is published to the host, on loopback. Compose keeps its own persistent database, separate from local SQLite. Use `docker compose stop` to stop services while preserving volumes.
 
-## What works
+### Your first investigation
 
-- Secure session sign-in, CSRF protection, workspace-scoped APIs, Argon2 passwords, organization profiles.
-- PDF/CSV/JSON/text/code uploads; local Git snapshots and bounded history; authorized HTTPS Git remotes; constrained HTTP document traversal.
-- pypdf extraction in a timed subprocess, byte/page/row/text limits, visible partial coverage, Redis/RQ jobs, cancellation, retry, idempotent content processing, stale-job recovery.
-- Gitleaks plus custom assignment/token/CSV-column rules; Presidio email, phone, and credit-card recognizers; explicit reserved-domain email support. Missing Gitleaks is visible and makes coverage partial.
-- Redacted evidence with normalized-text line/character locations; keyed fingerprints; distinct versions and source occurrences; deterministic organization signals; explainable near-duplicate and repeated-secret links.
-- Policy-based priority, incident filters, human review history, redacted JSON exports, browser printing, source rechecks, and first/last observations.
-- One bounded LangGraph investigation agent and six actual FastMCP tools over private stdio. Anthropic is the configurable live provider.
-- Overview, source management, incident queue/detail, settings, and persisted evaluation results, with responsive layouts and keyboard-accessible dialogs.
+No default password or preloaded demo data is shipped. After creating your account:
 
-## Offline and live modes
-
-Offline investigations are labeled **“LLM disabled.”** They run actual ingestion/detection/correlation with deterministic summaries; they make no model or MCP calls and do not establish live-agent success.
-
-To opt into real provider calls, set `LLM_MODE=live`, `ANTHROPIC_API_KEY`, and `LLM_MODEL` in the private server environment. Never place keys in frontend code or chat. Restart the backend/worker. Use **Run live agent** on an incident. Only redacted bounded context is sent. Usage is stored even if the investigation fails. Configure current input/output prices to enforce a conservative dollar limit; token, time, and six-tool ceilings apply independently. Pricing is not assumed.
-
-Live provider validation has **not** been performed without an authorized key. Tests use a controlled provider adapter with real MCP transport and are labeled accordingly. The lockfile pins FastMCP 3.4.7; its real stdio transport and controlled-provider integration are covered by tests.
-
-## Verify and measure
-
-```sh
-make test          # isolated backend/security/MCP/controlled-provider tests
-make build         # TypeScript and production frontend build
-make e2e           # Chrome journey against a fresh disposable database
-make compose-test  # temporary account; real PostgreSQL + Redis worker + API smoke test
-make evaluate      # development split; writes actual machine-readable results
+```mermaid
+flowchart LR
+    A["1. Sign in<br/>Add organization in Settings"] --> B["2. Upload or add source<br/>Run scan"]
+    B --> C["3. Open incident<br/>Inspect evidence"]
+    C --> D["4. Investigate<br/>Record review"]
 ```
 
-Browser tests use installed Google Chrome. They write local **verification** screenshots under `frontend/test-results/`; these are not presentation/demo assets. Tests never populate the owner's workspace.
+Use synthetic or explicitly authorized material. A scan with no findings produces no incident.
 
-The synthetic benchmark contains **200 documents, five fictional organizations, ten template families**. Development has 140 documents; held-out has 60. Family groups, including copies and all organizations, stay in one split. Ground truth is separate from runtime inputs. See [evaluation methodology](docs/EVALUATION.md); do not repeatedly tune on the held-out set.
+## Architecture
 
-Publish an actual results record to your Evaluation screen:
+```mermaid
+flowchart TD
+    UI["React + TypeScript<br/>Analyst interface"] -->|"Session cookie + CSRF"| API["FastAPI<br/>Authentication and workspace-scoped APIs"]
+    API --> DB[("PostgreSQL")]
+    API --> RAW["Restricted raw-file storage"]
+    API --> Q["Redis / RQ queue"]
+    Q --> W["Background worker"]
+    RAW --> W
+    W --> P["Bounded collectors<br/>and isolated parser subprocess"]
+    P --> D["Gitleaks + Presidio + custom rules"]
+    D --> R["Redaction · Attribution<br/>Correlation · Priority policy"]
+    R --> DB
+    W --> AG["Optional LangGraph investigation"]
+    AG <-->|"Bounded redacted context"| LLM["Configured Anthropic model"]
+    AG <-->|"Private stdio"| MCP["Case-scoped FastMCP<br/>6 read-only tools"]
+    MCP -->|"Scoped reads"| DB
+    AG --> VAL["Validate output and retrieved citations"]
+    VAL --> DB
+    classDef app fill:#eff6ff,stroke:#2563eb,color:#172554
+    classDef ai fill:#faf5ff,stroke:#9333ea,color:#3b0764
+    classDef data fill:#ecfdf5,stroke:#059669,color:#064e3b
+    class UI,API,W app
+    class AG,LLM,MCP,VAL ai
+    class DB,RAW data
+```
+
+| Layer | Technology / responsibility |
+|---|---|
+| Interface | React 19, TypeScript, Vite; overview, sources, incidents, settings and evaluation |
+| API and access | FastAPI, Pydantic, Argon2 passwords, opaque sessions and workspace checks |
+| Persistence | SQLAlchemy + Alembic; PostgreSQL in Compose, SQLite locally |
+| Background work | Redis/RQ in Compose; a single background executor locally |
+| Extraction and detection | pypdf, bounded CSV/JSON/text parsing, Gitleaks, selected Presidio recognizers and custom rules |
+| Optional AI | One LangGraph agent, Anthropic provider and FastMCP 3.4.7 over stdio |
+
+Local development runs **one API process** with SQLite. Compose adds the durable queue, worker and hourly raw-file retention / stale-job recovery. The same application code and migrations serve both modes.
+
+## How evidence stays traceable
+
+The app separates **content**, **where it was observed**, and **what the analyst decided**.
+
+```mermaid
+flowchart TD
+    S["Authorized source"] --> J["Scan jobs<br/>Progress and coverage"]
+    S --> O["Source occurrences<br/>Path, revision, first and last observation"]
+    O --> D["Distinct document<br/>Keyed content fingerprint"]
+    O --> M["Monitoring checks<br/>Observation history"]
+    D --> E["Findings and redacted evidence<br/>Detector version, lines and characters"]
+    D --> V["Version lineage<br/>Changed content at a source path"]
+    D --> I["Incident, when findings exist<br/>Priority and organization candidates"]
+    I --> A["Investigations and tool calls"]
+    I --> R["Append-only analyst reviews"]
+```
+
+| Situation | How LeakLens represents it |
+|---|---|
+| Identical content appears again | Reuse the document and incident; track its source occurrences |
+| Content changes at the same source path | Preserve distinct content and version lineage |
+| Documents look similar or repeat a secret | Add candidate links; keep separate incidents |
+| A domain or reference matches an organization | Store attribution evidence; ambiguous candidates stay visible |
+| An analyst changes priority or disposition | Append an audited review |
+| A source cannot be reached | Record uncertainty; a failed request does not prove removal |
+
+Content and secret identities use **HMAC-SHA256**. Similarity uses hashed shingles of redacted text. Priority comes from an explainable code policy; the model cannot overwrite it.
+
+> Existing content reuses its stored analysis. Detector upgrades or organization edits do not automatically rewrite historical evidence. See the [security review](docs/SECURITY_REVIEW.md) before sharing older reports.
+
+## Where the AI fits
+
+Collection, detection, redaction and priority calculation work without an LLM. AI is an optional investigation step after an incident exists.
+
+```mermaid
+flowchart TD
+    I["Incident and stored evidence"] --> MODE{"Investigation mode"}
+    MODE -->|Offline| OFF["Deterministic summary<br/>Label: LLM disabled"]
+    MODE -->|Live| CTX["Gather bounded, redacted context"]
+    CTX --> AG["LangGraph agent"]
+    AG -->|"Request a permitted tool"| MCP["Case-scoped MCP tools"]
+    MCP -->|"Redacted result and evidence IDs"| AG
+    AG -->|"Structured assessment"| VAL["Validate schema, organization<br/>and retrieved citation IDs"]
+    VAL --> OK["Save assessment<br/>or show failure / rejection"]
+    OFF --> REVIEW["Analyst reviews the result"]
+    OK --> REVIEW
+    classDef ai fill:#faf5ff,stroke:#9333ea,color:#3b0764
+    classDef outcome fill:#ecfdf5,stroke:#059669,color:#064e3b
+    class CTX,AG,MCP,VAL ai
+    class OFF,OK,REVIEW outcome
+```
+
+| Read-only MCP tool | Purpose |
+|---|---|
+| `get_document_metadata` | Inspect document metadata and coverage |
+| `get_redacted_content` | Retrieve bounded excerpts and visible evidence IDs |
+| `find_company_evidence` | Inspect stored organization-association signals |
+| `find_related_documents` | Inspect persisted related-document candidates |
+| `get_exposure_history` | Review source observations over time |
+| `search_remediation_guidance` | Retrieve curated remediation guidance |
+
+The tools have an immutable workspace/case scope and no generic shell, network or write capability. Default investigation ceilings are **6 tool calls**, **90 seconds**, **18,000 input tokens** and **3,000 output tokens**. Citation checks verify retrieved IDs; semantic support for the model's prose still requires review.
+
+<details>
+<summary><strong>Enable the optional live provider</strong></summary>
+
+Set these values in the private **server environment**:
+
+```dotenv
+LLM_MODE=live
+ANTHROPIC_API_KEY=<your-private-key>
+LLM_MODEL=<your-chosen-model>
+```
+
+Restart the backend/worker, then select **Run live agent** on an incident. Keep provider keys out of frontend code and Git. Only bounded, redacted context is sent; redaction is not a guarantee that all sensitive content has been removed.
+
+Configure both `INPUT_PRICE_PER_MILLION` and `OUTPUT_PRICE_PER_MILLION` to enable the conservative dollar ceiling. Token, time and tool limits apply independently. Pricing is not assumed; usage is recorded even if investigation fails.
+
+**Live-provider validation remains pending.** Integration tests use a controlled provider adapter with real MCP stdio transport. Offline mode makes no model or MCP calls.
+
+</details>
+
+## Repository map
+
+```text
+Leak_Lens_AI/
+├── backend/
+│   ├── app/
+│   │   ├── api/             # Routes, request schemas, request-size middleware
+│   │   ├── connectors/      # Authorized Git / HTTP collection and URL policy
+│   │   ├── parsers/         # Format extraction and subprocess limits
+│   │   ├── detectors/       # Secret / personal-data detection and redaction
+│   │   ├── attribution/     # Organization evidence and candidate scoring
+│   │   ├── correlation/     # Similar-content and repeated-secret links
+│   │   ├── workers/         # Scan jobs, ingestion and retention
+│   │   ├── agent/           # Bounded LangGraph investigation
+│   │   ├── mcp/             # Six case-scoped read-only tools
+│   │   ├── models/          # Database entities and relationships
+│   │   └── evaluation.py    # Reproducible benchmark runner
+│   ├── migrations/         # Alembic database migrations
+│   └── tests/              # Backend, security, MCP and integration checks
+├── frontend/
+│   ├── src/                # React screens, API client, types and styles
+│   └── tests/              # Playwright analyst journey
+├── evaluation/             # Synthetic inputs, ground truth and saved results
+├── scripts/                # Setup, development, detector install and smoke checks
+├── docs/                   # Architecture, deployment, evaluation and security
+├── compose.yaml            # Local PostgreSQL + Redis deployment
+├── compose.production.yaml # Deployment overrides
+├── .env.example            # Configuration template; no real credentials
+└── Makefile                # Common setup, run and verification commands
+```
+
+**Suggested reading path:** [scan pipeline](backend/app/workers/jobs.py) → [data model](backend/app/models/__init__.py) → [API](backend/app/api/main.py) → [agent](backend/app/agent/runner.py) → [interface](frontend/src/main.tsx).
+
+## Verification
+
+| Command | What it checks |
+|---|---|
+| `make test` | Backend, security regressions, real MCP transport and controlled-provider integration |
+| `make build` | TypeScript and production frontend build |
+| `make e2e` | Chrome analyst journey against a fresh disposable database |
+| `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
+| `make evaluate` | Development benchmark; writes measured results |
+
+**Recorded checks — 2026-09-30:** 74 backend tests passed, 1 opt-in live-provider test skipped; 1 Chrome journey passed; frontend build and Ruff passed. Locked dependency audits reported no known vulnerabilities on that date. The Docker runtime smoke was not rerun because the daemon was unavailable. See [verification records](PROGRESS.md) for details and limits.
+
+Browser tests require installed Google Chrome and write verification screenshots to ignored `frontend/test-results/`. They use a disposable database, not the owner's workspace.
+
+### What the benchmark measures
+
+```mermaid
+flowchart LR
+    DATA["200 synthetic documents<br/>5 fictional organizations<br/>10 template families"] --> DEV["Development: 140 documents<br/>7 template families"]
+    DATA --> HELD["Held-out: 60 documents<br/>3 template families"]
+    DEV --> A["A: detectors only"]
+    DEV --> B["B: detectors + rules"]
+    HELD --> AB["Evaluate A and B<br/>without tuning on held-out data"]
+```
+
+Copies and all organization variants of a template family stay in the same split. Ground truth is separate from runtime inputs.
+
+| Saved result | Development | Held-out |
+|---|---:|---:|
+| Detection F1 — A: detectors only | 0.909 | 1.000 |
+| Detection F1 — B: detectors + rules | 1.000 | 1.000 |
+| Duplicate-grouping F1 | 0.407 | 0.298 |
+
+These are **historical synthetic results for detector version 1.0**, not real-world accuracy claims or measurements of the current 1.1 detectors. Duplicate grouping remains weak. The live-agent benchmark has not run. See the [methodology](docs/EVALUATION.md), [development report](evaluation/report-development.md) and [held-out report](evaluation/report-held_out.md).
+
+<details>
+<summary><strong>Publish evaluation results and maintain local data</strong></summary>
+
+Publish a measured development result to your workspace's Evaluation screen:
 
 ```sh
 cd backend
 PATH="../.data/bin:$PATH" .venv/bin/python -m app.evaluation --split development --publish-email YOUR_ANALYST_EMAIL
 ```
 
-`make purge` removes expired raw files. `make recover` marks stale interrupted jobs as failed and makes them retryable. Compose runs both hourly; local mode requires manual scheduling. Raw retention defaults to 24 hours. Redacted evidence is retained separately.
+From the repository root:
 
-## Boundaries and remaining work
+```sh
+make purge       # remove expired raw files; default retention is 24 hours
+make recover     # mark stale interrupted jobs failed so they can be retried
+```
 
-Redaction is imperfect and entity coverage is intentionally narrow. No OCR, arbitrary web search, credential testing, SSH Git, private Git authentication, archives, embeddings, or enterprise discovery. Uploaded files do not establish public exposure. A missing source is not proof of deletion or credential revocation. Near-duplicate similarity can join unrelated redacted text; links remain candidates, not automatic ownership assertions.
+Compose runs these maintenance tasks hourly. Local development requires manual execution or scheduling. Redacted evidence is retained separately from raw files.
 
-Public hosting/HTTPS, live-provider smoke/benchmark, unfamiliar-organization evaluation, independent semantic-claim annotation, and a broader mixed-format benchmark remain pending. Remote Git network behavior is implemented but has not been tested against a user-authorized external repository. Review the [threat model](docs/THREAT_MODEL.md) before real sensitive-data use. This is an authenticated owner workspace; do not expose it as an unrestricted public uploader.
+</details>
 
-See [TODO](TODO.md), [progress and actual checks](PROGRESS.md), [architecture](docs/ARCHITECTURE.md), [operations](docs/DEPLOYMENT.md), [security review](docs/SECURITY_REVIEW.md), and [engineering notes](docs/ENGINEERING.md).
+## Scope and boundaries
+
+| Supported today | Boundary |
+|---|---|
+| Authenticated owner workspace | No unrestricted public upload service or enterprise discovery claim |
+| Authorized uploads, Git and HTTP sources | No arbitrary web search, SSH Git or private Git authentication |
+| Bounded PDF, CSV, JSON, text and code extraction | No OCR or archive extraction; partial coverage is reported |
+| Pattern-based redaction and selected personal-data entities | Coverage is intentionally narrow and redaction can miss values |
+| Source observations and manual rechecks | An upload does not establish public exposure; disappearance does not prove deletion or credential revocation |
+| Audited analyst decisions | No automatic credential testing or model-controlled priority changes |
+
+Public hosting/HTTPS, real-provider validation, an authorized external Git smoke test, unfamiliar-organization evaluation, independent semantic-claim review and broader mixed-format benchmarks remain pending. Review the [threat model](docs/THREAT_MODEL.md) before using real sensitive data.
+
+## Documentation
+
+| Read this | To understand |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | Process boundaries, persistence and design tradeoffs |
+| [Engineering notes](docs/ENGINEERING.md) | Implementation choices and development details |
+| [Deployment](docs/DEPLOYMENT.md) | Configuration, operation and deployment constraints |
+| [Evaluation](docs/EVALUATION.md) | Dataset construction, splits and metric definitions |
+| [Threat model](docs/THREAT_MODEL.md) | Trust boundaries, safeguards and residual risks |
+| [Security review](docs/SECURITY_REVIEW.md) | Fixed findings, dependency changes and historical-data caveats |
+| [Progress](PROGRESS.md) / [TODO](TODO.md) | Completed checks and remaining work |
+
+Independent LeakLens branding; no affiliation with CybelAngel. This is a portfolio-scale engineering project. Presentation assets and a seeded demonstration are deferred.
