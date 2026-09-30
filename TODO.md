@@ -1,6 +1,6 @@
 # LeakLens AI implementation checklist
 
-The owner asked to build the application and leave demonstration work for later. Synthetic verification fixtures are distinct from a presentation demo. The original build prompt is unchanged.
+The owner asked to build the application and leave demonstration work for later. Synthetic verification fixtures are distinct from a presentation demo. The original build prompt was removed from the repository by the owner.
 
 - [x] 1. Foundation: configuration, relational schema, explicit migrations, login, workspace isolation, local and PostgreSQL/Redis Compose startup.
 - [x] 2. Detection slice: uploads, bounded parsing, local detectors, redaction, asynchronous jobs, persisted findings/evidence, coverage warnings.

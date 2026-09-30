@@ -17,6 +17,10 @@ Official documentation consulted while implementing this build. Lockfiles record
 - [Tailwind Vite integration](https://tailwindcss.com/docs/installation/using-vite)
 - [Radix accessible dialog primitives](https://www.radix-ui.com/primitives/docs/components/dialog)
 
-The implementation uses a compatible pinned FastMCP 2.x client/server pair rather than adopting an unverified new major version during the build. The schema, authorization, evidence handling, policy, and investigation workflow are LeakLens application code layered on these libraries.
+The implementation uses a locked FastMCP 3.4.7 client/server pair, upgraded and regression-tested during the September 2026 security review. The schema, authorization, evidence handling, policy, and investigation workflow are LeakLens application code layered on these libraries.
+
+- [FastMCP 2-to-3 migration guide](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2)
+- [FastMCP security advisories](https://github.com/PrefectHQ/fastmcp/security/advisories)
+- [DiskCache pickle advisory](https://github.com/advisories/GHSA-w8v5-vhqr-4h9v) — the dependency was removed by the FastMCP upgrade.
 
 - [Nginx dynamic upstream DNS resolution](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#server): supported by the pinned Nginx 1.28 image; used to follow recreated API containers.

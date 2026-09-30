@@ -48,7 +48,7 @@ Offline investigations are labeled **“LLM disabled.”** They run actual inges
 
 To opt into real provider calls, set `LLM_MODE=live`, `ANTHROPIC_API_KEY`, and `LLM_MODEL` in the private server environment. Never place keys in frontend code or chat. Restart the backend/worker. Use **Run live agent** on an incident. Only redacted bounded context is sent. Usage is stored even if the investigation fails. Configure current input/output prices to enforce a conservative dollar limit; token, time, and six-tool ceilings apply independently. Pricing is not assumed.
 
-Live provider validation has **not** been performed without an authorized key. Tests use a controlled provider adapter with real MCP transport and are labeled accordingly. FastMCP is pinned to the compatible 2.x line; its upstream Authlib deprecation warning remains documented.
+Live provider validation has **not** been performed without an authorized key. Tests use a controlled provider adapter with real MCP transport and are labeled accordingly. The lockfile pins FastMCP 3.4.7; its real stdio transport and controlled-provider integration are covered by tests.
 
 ## Verify and measure
 
@@ -79,4 +79,4 @@ Redaction is imperfect and entity coverage is intentionally narrow. No OCR, arbi
 
 Public hosting/HTTPS, live-provider smoke/benchmark, unfamiliar-organization evaluation, independent semantic-claim annotation, and a broader mixed-format benchmark remain pending. Remote Git network behavior is implemented but has not been tested against a user-authorized external repository. Review the [threat model](docs/THREAT_MODEL.md) before real sensitive-data use. This is an authenticated owner workspace; do not expose it as an unrestricted public uploader.
 
-See [TODO](TODO.md), [progress and actual checks](PROGRESS.md), [architecture](docs/ARCHITECTURE.md), [operations](docs/DEPLOYMENT.md), and [engineering notes](docs/ENGINEERING.md).
+See [TODO](TODO.md), [progress and actual checks](PROGRESS.md), [architecture](docs/ARCHITECTURE.md), [operations](docs/DEPLOYMENT.md), [security review](docs/SECURITY_REVIEW.md), and [engineering notes](docs/ENGINEERING.md).
