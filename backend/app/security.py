@@ -10,6 +10,12 @@ from app.db import get_db
 from app.models import Session, User, now
 
 passwords = PasswordHash.recommended()
+dummy_password_hash = passwords.hash(secrets.token_urlsafe(32))
+
+
+def verify_password(password, stored_hash):
+    # Missing accounts still incur the password-hashing work of an existing account.
+    return passwords.verify(password, stored_hash or dummy_password_hash)
 
 
 def token_hash(token: str):
@@ -43,7 +49,9 @@ def current_user(request: Request, db: DBSession = Depends(get_db)):
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         if settings().public_read_only and request.url.path != "/api/auth/logout":
             raise HTTPException(403, "This workspace is read-only")
-        if not secrets.compare_digest(request.headers.get("x-csrf-token", ""), session.csrf):
+        if not secrets.compare_digest(
+            request.headers.get("x-csrf-token", "").encode(), session.csrf.encode()
+        ):
             raise HTTPException(403, "Refresh your session before making changes")
     request.state.session = session
     return user

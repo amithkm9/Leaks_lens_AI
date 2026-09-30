@@ -35,8 +35,6 @@ class State(TypedDict, total=False):
     pending: list
     final: dict
     tool_count: int
-    input_tokens: int
-    output_tokens: int
     done: bool
     seen_evidence: list[str]
     successful_tools: int
@@ -88,7 +86,7 @@ async def live(run_id, incident, evidence, occurrences):
         "DATA_DIR": str(cfg.data_dir.resolve()),
         "LEAKLENS_MCP_WORKSPACE": incident.workspace_id,
         "LEAKLENS_MCP_CASE": incident.id,
-        "FASTMCP_LOG_LEVEL": "ERROR",
+        "FASTMCP_LOG_LEVEL": "CRITICAL",
         "LANGCHAIN_TRACING_V2": "false",
         "LANGSMITH_TRACING": "false",
     }
@@ -209,15 +207,17 @@ async def live(run_id, incident, evidence, occurrences):
                         ToolCall(
                             workspace_id=incident.workspace_id,
                             investigation_id=run_id,
-                            name=call["name"],
+                            name=sanitize(call["name"])[:100],
                             arguments=sanitize(call["input"]),
                             result=payload,
                             duration_ms=int((time.monotonic() - start) * 1000),
                             success=success,
                         )
                     )
+                    usage["tool_calls"] += 1
+                    run = db.get(Investigation, run_id)
+                    run.usage = dict(usage)
                     db.commit()
-                usage["tool_calls"] += 1
                 results.append(
                     {
                         "type": "tool_result",
@@ -253,17 +253,14 @@ async def live(run_id, incident, evidence, occurrences):
         graph.add_node("agent_investigation", model)
         graph.add_node("mcp_tools", execute)
         graph.add_node("validate_result", validate)
-        graph.add_node("policy_priority", lambda state: {})
-        graph.add_node("analyst_review", lambda state: {})
         graph.add_edge(START, "gather_context")
         graph.add_edge("gather_context", "agent_investigation")
         graph.add_conditional_edges(
             "agent_investigation", lambda state: "validate_result" if state.get("done") else "mcp_tools"
         )
         graph.add_edge("mcp_tools", "agent_investigation")
-        graph.add_edge("validate_result", "policy_priority")
-        graph.add_edge("policy_priority", "analyst_review")
-        graph.add_edge("analyst_review", END)
+        # Priority is computed during ingestion; human review is a separate API action.
+        graph.add_edge("validate_result", END)
         result = await graph.compile().ainvoke({}, {"recursion_limit": 24})
         return result["final"], usage
 

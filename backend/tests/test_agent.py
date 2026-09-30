@@ -18,7 +18,7 @@ class Block:
 
 
 @pytest.mark.parametrize(
-    "behavior", ["valid", "invalid_json", "fake_citation", "timeout", "unauthorized_tool"]
+    "behavior", ["valid", "invalid_json", "fake_citation", "timeout", "unauthorized_tool", "timeout_after_tool"]
 )
 def test_graph_with_controlled_provider_and_real_mcp(client, monkeypatch, behavior):
     incident, _ = upload(
@@ -50,7 +50,7 @@ def test_graph_with_controlled_provider_and_real_mcp(client, monkeypatch, behavi
         async def create(self, **kwargs):
             captured.append(json.dumps(kwargs))
             self.calls += 1
-            if behavior == "timeout":
+            if behavior == "timeout" or (behavior == "timeout_after_tool" and self.calls == 2):
                 raise TimeoutError("Synthetic timeout")
             if self.calls == 1:
                 block = Block(
@@ -87,3 +87,6 @@ def test_graph_with_controlled_provider_and_real_mcp(client, monkeypatch, behavi
     else:
         assert result["status"] == "failed", result
         assert result["result"] == {}
+    if behavior == "timeout_after_tool":
+        assert result["usage"]["tool_calls"] == 1
+        assert result["usage"]["input_tokens"] == 100

@@ -1,6 +1,7 @@
 import logging
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
+from threading import Lock
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
@@ -29,8 +30,9 @@ from app.models import (
     EvaluationRun,
     now,
 )
-from app.security import current_user, scoped, passwords, create_session
+from app.security import current_user, scoped, verify_password, create_session
 from app.api.schemas import LoginIn, OrganizationIn, SourceIn, ReviewIn, InvestigationIn
+from app.api.middleware import RequestBodyLimitMiddleware
 from app.connectors.policy import validate_url, local_repository
 from app.detectors import availability, safe_text, sanitize
 from app.parsers import supported
@@ -51,7 +53,30 @@ async def lifespan(app):
 
 
 app = FastAPI(title="LeakLens AI", version="0.1.0", lifespan=lifespan)
-login_attempts = defaultdict(deque)
+app.add_middleware(RequestBodyLimitMiddleware)
+login_attempts = OrderedDict()
+login_attempts_lock = Lock()
+
+
+def throttle_login(identity):
+    now_seconds = time.monotonic()
+    with login_attempts_lock:
+        while login_attempts:
+            first = next(iter(login_attempts))
+            if login_attempts[first][-1] >= now_seconds - 60:
+                break
+            login_attempts.popitem(last=False)
+        if identity not in login_attempts:
+            if len(login_attempts) >= 4096:
+                raise HTTPException(429, "Too many sign-in attempts; wait one minute")
+            login_attempts[identity] = deque()
+        attempts = login_attempts[identity]
+        while attempts and attempts[0] < now_seconds - 60:
+            attempts.popleft()
+        if len(attempts) >= 10:
+            raise HTTPException(429, "Too many sign-in attempts; wait one minute")
+        attempts.append(now_seconds)
+        login_attempts.move_to_end(identity)
 
 
 def record(row, exclude=()):
@@ -91,7 +116,7 @@ async def security_headers(request, call_next):
 async def validation_error(request, exc):
     # Pydantic's default error includes the rejected input; never echo submitted secrets.
     return JSONResponse(
-        {"detail": "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['type']}" for e in exc.errors())},
+        {"detail": safe_text("; ".join(f"{'.'.join(map(str, e['loc']))}: {e['type']}" for e in exc.errors()))},
         status_code=422,
     )
 
@@ -123,15 +148,10 @@ def ready(db: DBSession = Depends(get_db)):
 @app.post("/api/auth/login")
 def login(payload: LoginIn, request: Request, response: Response, db: DBSession = Depends(get_db)):
     identity = request.client.host if request.client else "unknown"
-    now_seconds = time.monotonic()
-    attempts = login_attempts[identity]
-    while attempts and attempts[0] < now_seconds - 60:
-        attempts.popleft()
-    if len(attempts) >= 10:
-        raise HTTPException(429, "Too many sign-in attempts; wait one minute")
-    attempts.append(now_seconds)
+    throttle_login(identity)
     user = db.scalar(select(User).where(User.email == payload.email.lower().strip()))
-    if not user or not passwords.verify(payload.password, user.password_hash):
+    valid = verify_password(payload.password, user.password_hash if user else None)
+    if not user or not valid:
         raise HTTPException(401, "Email or password is incorrect")
     token, csrf = create_session(db, user)
     response.set_cookie(

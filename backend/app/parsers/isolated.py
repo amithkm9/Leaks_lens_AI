@@ -41,7 +41,10 @@ def parse(path, name, limits):
                     break
                 rows.append(row)
             meta["rows"] = max(0, len(rows) - 1)
-            text = "\n".join(",".join(row) for row in rows)
+            # Preserve quoted commas/newlines so secret columns cannot shift during detection.
+            normalized = io.StringIO()
+            csv.writer(normalized, lineterminator="\n").writerows(rows)
+            text = normalized.getvalue()
     if len(text) > limits["chars"]:
         warnings.append("Text character limit reached; remaining content was not scanned")
         text = text[: limits["chars"]]

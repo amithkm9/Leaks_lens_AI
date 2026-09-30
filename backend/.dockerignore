@@ -2,3 +2,8 @@
 __pycache__
 .pytest_cache
 tests
+.env
+.env.*
+.aws
+.data
+.git

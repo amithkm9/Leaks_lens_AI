@@ -30,11 +30,12 @@ def fetch(url, config):
         p, addresses = validate_url(url, config)
         port = p.port or (443 if p.scheme == "https" else 80)
         connection = http.client.HTTPConnection(p.hostname, port, timeout=12)
-        sock = socket.create_connection((addresses[0], port), timeout=12)
-        if p.scheme == "https":
-            sock = ssl.create_default_context().wrap_socket(sock, server_hostname=p.hostname)
-        connection.sock = sock
         try:
+            connection.sock = socket.create_connection((addresses[0], port), timeout=12)
+            if p.scheme == "https":
+                connection.sock = ssl.create_default_context().wrap_socket(
+                    connection.sock, server_hostname=p.hostname
+                )
             connection.request(
                 "GET",
                 p.path or "/",

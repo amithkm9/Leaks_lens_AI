@@ -1,13 +1,14 @@
 """Internal MCP server. Immutable workspace/case scope comes from its parent worker."""
 
 import os
+import io
 from sqlalchemy import select
 from fastmcp import FastMCP
 from app.db import SessionLocal
 from app.models import Incident, Document, Evidence, Occurrence, MonitoringCheck, now
 from app.detectors import sanitize
 
-mcp = FastMCP("LeakLens scoped evidence")
+mcp = FastMCP("LeakLens scoped evidence", mask_error_details=True)
 
 
 def scope(db):
@@ -49,10 +50,7 @@ def envelope(data, evidence_ids=(), complete=True, error=None):
 def get_document_metadata(document_id: str) -> dict:
     """Get stored metadata for a document in this investigation."""
     with SessionLocal() as db:
-        workspace, _, doc = document(db, document_id)
-        ids = db.scalars(
-            select(Evidence.id).where(Evidence.document_id == doc.id, Evidence.workspace_id == workspace)
-        ).all()
+        _, _, doc = document(db, document_id)
         return envelope(
             {
                 "document_id": doc.id,
@@ -60,8 +58,7 @@ def get_document_metadata(document_id: str) -> dict:
                 "category": doc.category,
                 "metadata": doc.metadata_json,
             },
-            ids,
-            not doc.metadata_json.get("coverage_warnings"),
+            complete=not doc.metadata_json.get("coverage_warnings"),
         )
 
 
@@ -72,14 +69,27 @@ def get_redacted_content(document_id: str, bounded_location: int = 1) -> dict:
         raise ValueError("Invalid location")
     with SessionLocal() as db:
         workspace, _, doc = document(db, document_id)
-        lines = doc.redacted_text.splitlines()
+        lines = list(io.StringIO(doc.redacted_text))
         evidence = db.scalars(
             select(Evidence).where(Evidence.document_id == doc.id, Evidence.workspace_id == workspace)
         ).all()
-        ids = [
-            e.id for e in evidence if bounded_location <= e.location.get("line", 0) < bounded_location + 30
-        ]
-        chunk = "\n".join(lines[bounded_location - 1 : bounded_location + 29])
+        chunk = "".join(lines[bounded_location - 1 : bounded_location + 29])
+        start = sum(len(line) for line in lines[: bounded_location - 1])
+        end = start + min(len(chunk), 6000)
+        line_offsets = []
+        offset = 0
+        for line in lines:
+            line_offsets.append(offset)
+            offset += len(line)
+        ids = []
+        for item in evidence:
+            line = item.location.get("line", 0)
+            if not 1 <= line <= len(lines):
+                continue
+            evidence_start = item.location.get("start", line_offsets[line - 1])
+            evidence_end = item.location.get("end", line_offsets[line - 1] + len(lines[line - 1]))
+            if start <= evidence_start < evidence_end <= end:
+                ids.append(item.id)
         return envelope(
             {
                 "document_id": doc.id,
@@ -88,7 +98,7 @@ def get_redacted_content(document_id: str, bounded_location: int = 1) -> dict:
                 "total_lines": len(lines),
             },
             ids,
-            len(chunk) <= 6000 and bounded_location + 29 >= len(lines),
+            not doc.metadata_json.get("coverage_warnings") and start == 0 and end == len(doc.redacted_text),
         )
 
 
@@ -108,11 +118,13 @@ def find_company_evidence(document_id: str) -> dict:
 def find_related_documents(document_id: str) -> dict:
     """Get explainable near-duplicate and repeated-secret candidate links."""
     with SessionLocal() as db:
-        workspace, _, doc = document(db, document_id)
+        workspace, root_case, doc = document(db, document_id)
         case = db.scalar(
             select(Incident).where(Incident.document_id == doc.id, Incident.workspace_id == workspace)
         )
-        return envelope(case.related[:20] if case else [], complete=not case or len(case.related) <= 20)
+        allowed = {root_case.document_id, *(r["document_id"] for r in root_case.related)}
+        links = [r for r in case.related if r["document_id"] in allowed] if case else []
+        return envelope(links[:20], complete=not case or len(links) == len(case.related) <= 20)
 
 
 @mcp.tool

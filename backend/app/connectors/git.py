@@ -91,7 +91,9 @@ def collect(config, staging, cancelled=lambda: False):
             str(repo),
         ]
         try:
-            proc = subprocess.run(args, capture_output=True, timeout=90, env=git_env())
+            proc = subprocess.run(
+                args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=90, env=git_env()
+            )
         except subprocess.TimeoutExpired:
             raise ValueError("Remote Git fetch timed out") from None
         if proc.returncode:
@@ -117,7 +119,7 @@ def collect(config, staging, cancelled=lambda: False):
                 result.warnings.append(f"Unsupported file skipped: {safe_text(name)}")
                 result.complete = False
                 continue
-            if len(result.items) >= settings().max_documents:
+            if len(result.items) >= min(config.get("max_documents", 100), settings().max_documents):
                 result.complete = False
                 result.warnings.append("Git document limit reached; history is only partially scanned")
                 return result

@@ -137,7 +137,8 @@ def evaluate(split, publish_email=None):
     rows = []
     for row in labels:
         raw = (ROOT / "inputs" / row["file"]).read_text()
-        assert hashlib.sha256(raw.encode()).hexdigest() == row["sha256"]
+        if hashlib.sha256(raw.encode()).hexdigest() != row["sha256"]:
+            raise ValueError("Evaluation input does not match the frozen manifest")
         start = time.monotonic()
         redacted, hits, warnings = detect(raw)
         attribution = attribute(raw, orgs)

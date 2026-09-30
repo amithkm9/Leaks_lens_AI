@@ -1,5 +1,7 @@
 import hashlib
 import hmac
+import csv
+import io
 import importlib.metadata
 import json
 import re
@@ -9,14 +11,36 @@ import tempfile
 from pathlib import Path
 from app.config import settings
 
+CUSTOM_VERSION = "1.1"
 SECRET = re.compile(
     r"""(?im)(?:api[_-]?key|secret|password|access[_-]?token|auth[_-]?token)["']?\s*[=:]\s*["']?([^\s"',;}]{6,})"""
+)
+QUOTED_SECRET = re.compile(
+    r"""(?im)(?:api[_-]?key|secret|password|access[_-]?token|auth[_-]?token)["']?\s*[=:]\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')"""
 )
 TOKEN = re.compile(r"\b(?:AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,})\b")
 EMAIL = re.compile(r"\b[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 PHONE = re.compile(r"(?<!\w)(?:\+\d[\d ()-]{8,}\d)(?!\w)")
 QUERY = re.compile(r"(?i)([?&](?:token|key|api_key|secret|password|signature|auth|code)=)[^&#\s]+")
-AUTH = re.compile(r"(?im)(authorization\s*[:=]\s*)(?:bearer|basic)?\s*[^\r\n]+")
+AUTH = re.compile(r"""(?im)(authorization["']?\s*[:=]\s*["']?)(?:bearer|basic)?\s*[^\r\n]+""")
+URL_CREDENTIALS = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://([^\s/@]+@)")
+CARD = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
+SENSITIVE_FIELDS = {
+    "apikey",
+    "secret",
+    "password",
+    "passwd",
+    "accesstoken",
+    "authtoken",
+    "refreshtoken",
+    "authorization",
+    "token",
+    "privatekey",
+    "clientsecret",
+    "creditcard",
+    "cardnumber",
+}
+CSV_CELL = re.compile(r'("(?:[^"]|"")*"|[^,\r\n]*)(,|\r?\n|$)')
 PLACEHOLDERS = {
     "changeme",
     "your_api_key",
@@ -37,12 +61,31 @@ def fingerprint(value):
 
 def safe_text(text):
     """Defense-in-depth sanitizer for metadata and analyst/provider output."""
-    text = AUTH.sub(r"\1[REDACTED_AUTH]", str(text))
+    text = URL_CREDENTIALS.sub(lambda m: m.group(0).replace(m.group(1), "[REDACTED_AUTH]@"), str(text))
+    text = AUTH.sub(r"\1[REDACTED_AUTH]", text)
     text = QUERY.sub(r"\1[REDACTED]", text)
+    text = QUOTED_SECRET.sub(
+        lambda m: (
+            m.group(0)[: m.start(1 if m.group(1) is not None else 2) - m.start()]
+            + "[REDACTED_SECRET]"
+            + m.group(0)[m.end(1 if m.group(1) is not None else 2) - m.start() :]
+        ),
+        text,
+    )
     text = SECRET.sub(lambda m: m.group(0).replace(m.group(1), "[REDACTED_SECRET]"), text)
     text = TOKEN.sub("[REDACTED_SECRET]", text)
     text = EMAIL.sub("[REDACTED_EMAIL]", text)
-    return PHONE.sub("[REDACTED_PHONE]", text)
+    text = PHONE.sub("[REDACTED_PHONE]", text)
+
+    def mask_card(match):
+        digits = [int(c) for c in match.group(0) if c.isdigit()]
+        checksum = sum(
+            (2 * digit - 9 if digit >= 5 else 2 * digit) if i % 2 else digit
+            for i, digit in enumerate(reversed(digits))
+        )
+        return "[REDACTED_CARD]" if checksum % 10 == 0 else match.group(0)
+
+    return CARD.sub(mask_card, text)
 
 
 def sanitize(value):
@@ -51,7 +94,12 @@ def sanitize(value):
     if isinstance(value, list):
         return [sanitize(v) for v in value]
     if isinstance(value, dict):
-        return {safe_text(k): sanitize(v) for k, v in value.items()}
+        return {
+            safe_text(k): "[REDACTED]"
+            if re.sub(r"[^a-z0-9]", "", str(k).lower()) in SENSITIVE_FIELDS
+            else sanitize(v)
+            for k, v in value.items()
+        }
     return value
 
 
@@ -62,7 +110,7 @@ def availability():
         presidio = None
     gitleaks = shutil.which("gitleaks")
     return {
-        "custom": "1.0",
+        "custom": CUSTOM_VERSION,
         "presidio": presidio,
         "gitleaks": bool(gitleaks),
         "pii_entities": ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD"],
@@ -73,10 +121,10 @@ def availability():
 def detect(text):
     hits, warnings = [], []
 
-    def add(start, end, kind, detector, version="1.0", score=None):
+    def add(start, end, kind, detector, version=CUSTOM_VERSION, score=None, value=None):
         if end <= start:
             return
-        value = text[start:end]
+        value = text[start:end] if value is None else value
         hits.append(
             dict(
                 start=start,
@@ -92,31 +140,14 @@ def detect(text):
 
     for match in SECRET.finditer(text):
         add(*match.span(1), "SUSPECTED_SECRET", "leaklens-patterns")
+    for match in QUOTED_SECRET.finditer(text):
+        add(*match.span(1 if match.group(1) is not None else 2), "SUSPECTED_SECRET", "leaklens-patterns")
     for match in TOKEN.finditer(text):
         add(*match.span(), "SUSPECTED_SECRET", "leaklens-patterns")
-    # Structured exports put the secret label in the header, not beside each value.
-    columns = []
-    offset = 0
-    for line in text.splitlines(keepends=True):
-        cells = line.rstrip("\r\n").split(",")
-        secret_columns = [
-            i
-            for i, cell in enumerate(cells)
-            if re.fullmatch(
-                r"(?i)(?:api[_-]?key|secret|password|access[_-]?token|auth[_-]?token)",
-                cell.strip().strip('"'),
-            )
-        ]
-        if len(cells) > 1 and secret_columns:
-            columns = secret_columns
-        elif columns and len(cells) > max(columns):
-            for column in columns:
-                value = cells[column].strip().strip('"')
-                if value:
-                    cell_start = sum(len(c) + 1 for c in cells[:column])
-                    start = offset + cell_start + cells[column].find(value)
-                    add(start, start + len(value), "SUSPECTED_SECRET", "leaklens-csv-columns")
-        offset += len(line)
+    for match in URL_CREDENTIALS.finditer(text):
+        add(*match.span(1), "SUSPECTED_SECRET", "leaklens-patterns")
+    for start, end, value in csv_secret_spans(text):
+        add(start, end, "SUSPECTED_SECRET", "leaklens-csv-columns", value=value)
 
     try:
         from presidio_analyzer.predefined_recognizers import (
@@ -196,9 +227,44 @@ def detect(text):
     hits = sorted(unique.values(), key=lambda x: (x["start"], -x["end"]))
     mask = list(text)
     for hit in hits:
-        mask[hit["start"] : hit["end"]] = ["█"] * (hit["end"] - hit["start"])
+        mask[hit["start"] : hit["end"]] = [
+            char if char in "\r\n" else "█" for char in text[hit["start"] : hit["end"]]
+        ]
     # Preserve line and character coordinates for evidence citations.
     redacted = "".join(mask)
     redacted = AUTH.sub(lambda m: m.group(1) + "█" * (len(m.group(0)) - len(m.group(1))), redacted)
     redacted = QUERY.sub(lambda m: m.group(1) + "█" * (len(m.group(0)) - len(m.group(1))), redacted)
     return redacted, hits, warnings
+
+
+def csv_secret_spans(text):
+    """Locate whole CSV secret fields, including quoted delimiters and multiline values."""
+    lines = list(io.StringIO(text))
+    offsets = [0]
+    for line in lines:
+        offsets.append(offsets[-1] + len(line))
+    csv.field_size_limit(max(csv.field_size_limit(), len(text)))
+    reader = csv.reader(io.StringIO(text))
+    previous_line = 0
+    columns = []
+    try:
+        for row in reader:
+            start = offsets[previous_line]
+            raw_row = text[start : offsets[reader.line_num]]
+            previous_line = reader.line_num
+            headers = [
+                i
+                for i, cell in enumerate(row)
+                if re.sub(r"[^a-z0-9]", "", cell.strip().lower()) in SENSITIVE_FIELDS
+            ]
+            if len(row) > 1 and headers:
+                columns = headers
+                continue
+            spans = list(CSV_CELL.finditer(raw_row))
+            for column in columns:
+                if column < len(row) and column < len(spans) and row[column]:
+                    left, right = spans[column].span(1)
+                    yield start + left, start + right, row[column]
+    except csv.Error:
+        # Arbitrary source code need not be CSV; normalized CSV inputs are well formed.
+        return

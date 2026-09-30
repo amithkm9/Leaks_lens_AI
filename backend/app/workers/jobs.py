@@ -51,7 +51,7 @@ def is_cancelled(job_id):
 
 
 def evidence_excerpt(text, line):
-    lines = text.splitlines()
+    lines = text.split("\n")
     return "\n".join(lines[max(0, line - 2) : line + 1])[:1500]
 
 
@@ -87,7 +87,6 @@ def ingest(db, job, source, item):
         )
         db.add(document)
         db.flush()
-        finding_rows = []
         for hit in hits:
             line = raw[: hit["start"]].count("\n") + 1
             ev = Evidence(
@@ -122,7 +121,6 @@ def ingest(db, job, source, item):
                 },
             )
             db.add(finding)
-            finding_rows.append(finding)
         for association in attributions:
             association["evidence_ids"] = []
             for signal in association["signals"]:

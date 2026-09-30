@@ -6,7 +6,7 @@ import time
 import httpx
 from sqlalchemy import delete, select
 from app.db import Base, SessionLocal
-from app.models import Workspace, User, Session, Incident, Evidence
+from app.models import Workspace, User, Session
 from app.security import passwords
 from app.config import settings
 

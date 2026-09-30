@@ -11,6 +11,8 @@ class AccessDenied(ValueError):
 
 
 def validate_url(url, config):
+    if len(url) > 2000 or any(ord(c) < 33 or ord(c) == 127 for c in url):
+        raise AccessDenied("Invalid URL characters or length")
     p = urlsplit(url)
     if p.scheme not in {"http", "https"} or not p.hostname or p.username or p.password or p.fragment:
         raise AccessDenied("Only configured HTTP(S) URLs without credentials or fragments are supported")
@@ -19,8 +21,13 @@ def validate_url(url, config):
     host = p.hostname.lower()
     if host not in config.get("allowed_hosts", []):
         raise AccessDenied("Destination host is outside this source's allowlist")
-    decoded = unquote(unquote(p.path or "/"))
-    if "\\" in decoded or any(c in decoded for c in ("\x00", "\r", "\n")):
+    decoded = unquote(p.path or "/", errors="strict")
+    if (
+        "\\" in decoded
+        or "%" in decoded
+        or any(ord(c) < 32 or ord(c) == 127 for c in decoded)
+        or any(segment in {".", ".."} for segment in decoded.split("/"))
+    ):
         raise AccessDenied("Invalid URL path")
     normalized = posixpath.normpath(decoded)
     prefixes = config.get("path_prefixes", [])
@@ -63,8 +70,3 @@ def local_repository(value):
             "Local repositories must be inside LOCAL_REPO_ROOT and contain a regular .git directory"
         )
     return path
-
-
-def display_url(url):
-    p = urlsplit(url)
-    return urlunsplit((p.scheme, p.hostname or "", p.path, "", ""))
