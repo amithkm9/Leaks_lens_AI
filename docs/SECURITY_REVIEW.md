@@ -17,7 +17,9 @@ Scope: application Python/TypeScript, tests, ingestion and parser boundaries, au
 | Audit integrity | Persist tool-call usage immediately, including when the next provider call fails; enforce benchmark input hashes even under optimized Python. |
 | Dead code | Removed an unused URL helper, unused finding accumulation, unused agent-state token fields, empty graph nodes, and unused smoke-test imports. Framework-required validator signatures were retained. |
 
-Custom detectors are versioned **1.1** after these changes. Existing documents, evidence, and reviews are not rewritten automatically. Reprocessing identical content currently reuses its stored detection results, so previously ingested sensitive material requires an operator-reviewed evidence migration or a fresh isolated workspace; a simple rescan does not repair historical redaction. Do not share old reports without reviewing them.
+Custom detectors are versioned **1.1** after these changes. Existing documents, evidence, and reviews were not rewritten by this September update.
+
+**October 5 follow-up:** versioned analysis now quarantines migrated evidence whose original redaction provenance was not recorded. Incompatible parser/detector revisions are also restricted. Incident lists/details, exports, AI results/tool logs, workers, and MCP reads enforce the restriction; requests to export or investigate a restricted revision are rejected. An explicit original-byte reanalysis or observation with changed pipeline/profile inputs creates a separate revision. Old IDs, excerpts, decisions, and investigations remain preserved for operator audit, with no automatic unlock of restricted history. Raw-file expiry requires a new original upload or successful authorized reacquisition. New revisions start a fresh review; compatible prior decisions are accessible through the revision selector. This is a quarantine-and-reanalyze path, not a claim that redaction can be proven complete or that previously downloaded reports have been repaired.
 
 ## Dependencies
 

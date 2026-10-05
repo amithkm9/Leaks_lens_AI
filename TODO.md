@@ -64,11 +64,11 @@ Acceptance: the analyst can find source 51, update a source, archive it without 
 
 ### 2. Add versioned analysis and explicit reanalysis
 
-- [ ] Separate immutable content identity from an analysis run. Record parser, detector, attribution/policy, and organization-profile versions, including runs with no findings.
-- [ ] Show analysis freshness and an explicit reanalysis action. A scan may reuse a compatible analysis; a requested refresh creates a new analysis with a recorded reason.
-- [ ] Bind findings, evidence, AI investigations, and reviews to the analysis they used. Preserve historical decisions and make the current analysis unambiguous.
-- [ ] Reacquire an authorized source or require a new upload when original bytes have expired. Never treat analysis of masked text as equivalent to analysis of original content.
-- [ ] Define a separate historical-redaction repair path: retain audit provenance while restricting/quarantining unsafe old excerpts and exports until they have been reviewed or repaired. Versioning alone does not fix an old disclosure.
+- [x] Separate immutable content identity from an analysis run. Record parser, detector, attribution/policy, and organization-profile versions, including runs with no findings.
+- [x] Show analysis freshness and an explicit reanalysis action. A scan may reuse a compatible analysis; a requested refresh creates a new analysis with a recorded reason.
+- [x] Bind findings, evidence, AI investigations, and reviews to the analysis they used. Preserve historical decisions and make the current analysis unambiguous.
+- [x] Reacquire an authorized source or require a new upload when original bytes have expired. Never treat analysis of masked text as equivalent to analysis of original content.
+- [x] Define a separate historical-redaction repair path: retain audit provenance while restricting/quarantining unsafe old excerpts and exports until they have been reviewed or repaired. Versioning alone does not fix an old disclosure.
 
 Acceptance: changing a detector/profile and explicitly reanalyzing identical bytes creates new results while old evidence references and reviews remain traceable. Expired input produces an actionable message. Exports identify the analysis version and respect historical-evidence restrictions.
 
@@ -115,4 +115,4 @@ Acceptance: publish results against a new frozen test set with failure examples 
 
 The integration direction is supported by existing ecosystems: [Gitleaks supports baselines and SARIF reports](https://github.com/gitleaks/gitleaks), and [GitHub's SARIF ingestion uses stable rule IDs, paths, and fingerprints to track results](https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/sarif-support). These are integration opportunities, not features already implemented in LeakLens. Remediation design should also retain the distinction between an alert's resolution and action on the credential itself; see [GitHub's alert-resolution guidance](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-secret-scanning-alerts/resolving-alerts).
 
-The first source-management slice is implemented. Next: finish focused workflow improvements and implement versioned analysis before adding scheduled monitoring. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.
+Source management and versioned analysis are implemented. Next: build opt-in scheduled monitoring with durable source claims and change events, then complete the remaining focused workflow improvements. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.

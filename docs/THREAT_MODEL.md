@@ -33,3 +33,7 @@ Anthropic receives only bounded, locally redacted evidence when live mode is exp
 ## Public hosting
 
 Keep this an authenticated owner-only application. For a later public synthetic showcase, use isolated disposable workspaces, synthetic data, disabled arbitrary source creation/uploads and shared paid-model access, and explicit reset behavior. `PUBLIC_READ_ONLY=true` blocks mutation APIs for an existing seeded read-only workspace; this is not a substitute for per-visitor isolation. The current task deliberately defers that showcase.
+
+## Historical analysis restrictions (2026-10-05)
+
+Analysis snapshots and their evidence IDs are retained across reanalysis. Unknown legacy redaction provenance or a different current parser/detector manifest restricts excerpts, derived summaries/attribution, review text, AI outputs/tool logs, and exports at application boundaries. Investigations capture root and allowed related-document analysis revisions; an output is also restricted if one of those pinned revisions becomes restricted. Reanalysis uses original bytes and creates a new revision, preserving the restricted audit record. Database operators and backups still hold historical data and require the same access/retention controls; the application cannot revoke previously downloaded reports. Compatible redaction with changed organization or policy inputs is labeled stale. Version compatibility is a provenance check, not a guarantee of complete detection.

@@ -2,6 +2,17 @@
 
 Updated 2026-10-05. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
 
+## Versioned analysis and reanalysis (2026-10-05)
+
+- Added immutable document-analysis revisions, including zero-finding results, with parser/detector versions, extraction limits, attribution/policy versions, original format/context, organization-profile snapshots, source job, request reason, and actor. Compatible scans reuse results; changed inputs or explicit requests create a new revision from original bytes.
+- Bound findings, evidence, reviews, and investigations to their analysis revision. New revisions start a fresh open review with policy priority; earlier dispositions, priority overrides, citations, and AI results remain on their original revision. Queued investigations and real MCP tools retain their captured root/related analysis scope after later reanalysis.
+- Added incident-level and source-wide reanalysis, revision selection in the URL, freshness/restriction notices, job progress/errors, archived/expired-input handling, stale request rejection, and versioned JSON exports (schema 2). Source-wide requests include previously benign documents. Targeted reacquisition only accepts matching original bytes and does not mark unrelated occurrences absent.
+- Added migration `a821f47d62bc`. Existing rows become restricted revision 1 with unknown provenance; original evidence IDs, reviews, and results stay stored. Current redaction compatibility is enforced on lists, reports, exports, AI outputs/tool logs, workers, and MCP content. Fresh original-byte analysis creates an available new revision; restricted history is not silently unlocked. Downgrade refuses stores with multiple revisions instead of flattening audit history.
+- Local verification: **91 backend tests passed, 1 opt-in live-provider test skipped** (37.58 seconds); **2 Chrome browser journeys passed** (18.5 seconds), including incident/source reanalysis, historical decisions/exports, and mobile layout. TypeScript/Vite build, Ruff, and whitespace checks passed. No paid provider calls were made; evaluation v1 inputs/results were untouched.
+- Regression coverage includes populated SQLite migration and rollback refusal; forced/automatic refresh; compatible reuse; immutable old evidence/reviews/results; cross-workspace, stale, archived, and busy-source guards; expired/changed originals; transaction rollback after evidence writes; no-finding revisions; duplicate files within one source job; and pinned real MCP reads after reanalysis.
+- Created and integrity-checked a private local SQLite backup in ignored `.data/backups/`, applied the migration, and confirmed no Alembic schema drift. No deployed PostgreSQL data was changed. GitHub Actions will verify the pushed revision separately; the previous source-management CI result below remains attributed to its original commit.
+- Next roadmap milestone: opt-in schedules with durable source claims, recoverable queue submission, and meaningful change events. Scheduled monitoring and notification delivery are not part of this release.
+
 ## Source management implementation (2026-10-05)
 
 - Added source editing with explicit authorization and optimistic revision checks, reversible archiving, restoration, and append-only source change history. Connector type and destination remain fixed; names, access context, and collection boundaries/limits can be updated. Active scans block edits/archive.

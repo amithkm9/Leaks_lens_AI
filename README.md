@@ -123,13 +123,13 @@ Local development runs **one API process** with SQLite. Compose adds the durable
 
 The Sources screen supports search, active/archived filters, and paginated source and scan history. Edit a source to change its name, access context, and collection limits after reaffirming authorization. Its connector type and destination remain fixed; configure a new source for a different repository or root URL. Edits and archiving wait for any active scan to finish or be cancelled.
 
-Archiving preserves incidents, reports, and history while blocking new checks/scans. Restore the source to resume manual scans. Each change records its actor and revision, and new scan jobs capture the configuration they execute. Editing access context does not rewrite previously observed evidence. Automatic schedules and versioned detector reanalysis remain planned.
+Archiving preserves incidents, reports, and history while blocking new checks/scans. Restore the source to resume manual scans. Each change records its actor and revision, and new scan jobs capture the configuration they execute. Editing access context does not rewrite previously observed evidence. Automatic schedules remain planned.
 
 For an existing local installation, stop the app, run `make migrate`, and restart with `make dev`. Compose applies migrations through its migration service when updating. The source-management migration preserves existing records; old completed scans are labeled as having no recorded configuration.
 
 ## How evidence stays traceable
 
-The app separates **content**, **where it was observed**, and **what the analyst decided**.
+The app separates **content**, **analysis revisions**, **where it was observed**, and **what the analyst decided**.
 
 ```mermaid
 flowchart TD
@@ -137,16 +137,18 @@ flowchart TD
     S --> O["Source occurrences<br/>Path, revision, first and last observation"]
     O --> D["Distinct document<br/>Keyed content fingerprint"]
     O --> M["Monitoring checks<br/>Observation history"]
-    D --> E["Findings and redacted evidence<br/>Detector version, lines and characters"]
+    D --> AR["Analysis revisions<br/>Pipeline and organization-profile snapshot"]
+    AR --> E["Findings and redacted evidence<br/>Detector version, lines and characters"]
     D --> V["Version lineage<br/>Changed content at a source path"]
     D --> I["Incident, when findings exist<br/>Priority and organization candidates"]
-    I --> A["Investigations and tool calls"]
-    I --> R["Append-only analyst reviews"]
+    AR --> A["Investigations and tool calls<br/>Pinned to this analysis"]
+    AR --> R["Append-only analyst reviews<br/>Pinned to this analysis"]
 ```
 
 | Situation | How LeakLens represents it |
 |---|---|
-| Identical content appears again | Reuse the document and incident; track its source occurrences |
+| Identical content appears again | Reuse a compatible analysis; changed pipeline, profiles, format, or exposure context creates a new revision |
+| An analyst requests reanalysis | Read original bytes and create a new revision with a reason, preserving earlier findings and decisions |
 | Content changes at the same source path | Preserve distinct content and version lineage |
 | Documents look similar or repeat a secret | Add candidate links; keep separate incidents |
 | A domain or reference matches an organization | Store attribution evidence; ambiguous candidates stay visible |
@@ -155,7 +157,17 @@ flowchart TD
 
 Content and secret identities use **HMAC-SHA256**. Similarity uses hashed shingles of redacted text. Priority comes from an explainable code policy; the model cannot overwrite it.
 
-> Existing content reuses its stored analysis. Detector upgrades or organization edits do not automatically rewrite historical evidence. See the [security review](docs/SECURITY_REVIEW.md) before sharing older reports.
+### Reanalysis and history
+
+Open an incident’s **Analysis revision** selector to inspect earlier evidence, reviews, and AI investigations. Choose **Reanalyze original document**, select an available authorized source, and record a reason. **Sources → Reanalyze** collects all available documents within that source’s limits, including documents with no previous findings. Compatible ordinary scans reuse results; changed analysis inputs automatically produce a fresh revision when original content is observed again.
+
+Each new analysis starts an open review with its calculated priority. Earlier confirmations, dismissals, remediation decisions, and priority overrides remain attached to their original revision. A result with no findings does not automatically establish remediation or complete detection coverage. Observation history always describes the latest source checks, independently of the selected analysis revision.
+
+Expired uploads require uploading the original file again. A targeted remote reanalysis must find matching original bytes; changed or unavailable files leave the current analysis intact. Redacted text is never used as substitute input. After reuploading unchanged content with compatible analysis, select the newly available source to explicitly request another revision.
+
+**Upgrading existing data:** migration `a821f47d62bc` preserves old records as revision 1 with unknown pipeline/profile provenance. It restricts their excerpts, derived assessments, and exports. A parser/detector change also restricts revisions produced by a different redaction pipeline. Reanalyzing original bytes creates a usable new revision; the old restricted revision remains preserved for operator audit and is not automatically unlocked. Organization/profile or priority-policy changes mark results stale without restricting compatible redaction. This does not certify that automated redaction catches every sensitive value.
+
+JSON exports use schema version **2**, identify the selected analysis revision, and return HTTP 409 for restricted revisions. API clients can select history with `?analysis_revision=N` on incident detail/export and should send `analysis_revision` with review/investigation requests to reject stale screens. Reanalysis endpoints require a reason and an expected document/source revision. See the [security review](docs/SECURITY_REVIEW.md) and [rollback instructions](docs/DEPLOYMENT.md#updates-and-rollback).
 
 ## Where the AI fits
 
@@ -253,7 +265,7 @@ Leak_Lens_AI/
 | `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
 | `make evaluate` | Development benchmark; writes measured results |
 
-**Recorded checks — 2026-10-05:** 81 backend tests passed, 1 opt-in live-provider test skipped; 2 Chrome journeys passed; frontend build and Ruff passed. The tests include a populated SQLite migration regression and source lifecycle/workspace-isolation checks. GitHub Actions now defines automatic application and PostgreSQL migration checks. The prior dependency audits and Docker runtime records remain dated to their earlier runs; see [verification records](PROGRESS.md) for details and limits.
+**Recorded checks — 2026-10-05:** Versioned analysis extends the backend and browser regression coverage with preserved evidence/decisions, stale requests, original-byte reacquisition, restricted historical output, pinned MCP reads, and populated migration checks. Exact current counts and CI results are recorded in [PROGRESS.md](PROGRESS.md). GitHub Actions runs application and PostgreSQL migration checks. The prior dependency audits and Docker runtime records remain dated to their earlier runs; see [verification records](PROGRESS.md) for details and limits.
 
 Browser tests require installed Google Chrome and write verification screenshots to ignored `frontend/test-results/`. They use a disposable database, not the owner's workspace.
 

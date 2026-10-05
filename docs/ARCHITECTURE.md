@@ -32,7 +32,7 @@ The worker writes redacted excerpts, findings, attribution evidence, versions, a
 
 Live investigation uses `gather_context → agent_investigation → MCP tools → agent_investigation → validate_result`. Collection, detection, and policy calculation are explicit worker phases preceding that graph. Validation attaches the existing code-computed policy and never lets model output overwrite the incident's priority. Human review and priority overrides are separate authenticated API actions with audit records. Empty graph nodes that previously represented those external stages have been removed.
 
-FastMCP 3.4.7's compatible client is an actual MCP client adapter. It launches the internal server with immutable workspace/case IDs supplied by the trusted worker, without loading the owner's dotenv file or provider key. Model arguments cannot change that scope. Related documents and returned relationship metadata must be in the persisted case's allowed set. No externally reachable MCP listener or generic shell/network/write tool exists. The six tools return timestamp, completeness, error information, and applicable evidence IDs. Metadata-only and curated-guidance responses have no document evidence IDs. Content responses expose citation IDs only for evidence fully contained in the returned text window.
+FastMCP 3.4.7's compatible client is an actual MCP client adapter. It launches the internal server with immutable workspace/case IDs and analysis revisions supplied by the trusted worker, without loading the owner's dotenv file or provider key. Model arguments cannot change that scope. Related documents and returned relationship metadata must be in the investigation’s captured allowed set. Each content, metadata, and attribution tool resolves its pinned analysis revision and checks redaction compatibility; later reanalysis cannot substitute newer evidence into a running investigation. No externally reachable MCP listener or generic shell/network/write tool exists. The six tools return timestamp, completeness, error information, and applicable evidence IDs. Metadata-only and curated-guidance responses have no document evidence IDs. Content responses expose citation IDs only for evidence fully contained in the returned text window.
 
 Model results must match a strict Pydantic schema. Organization proposals must be supported stored candidates. Citations must belong to this case and have actually been retrieved in successful tool results. IDs alone do not validate the semantics of prose: claim support stays `unreviewed`. Failed, timed-out, unsupported, and malformed assessments are visibly rejected. Failed tool calls are stored and returned to the model with errors; an investigation cannot complete without a successful MCP call.
 
@@ -44,13 +44,14 @@ Model results must match a strict Pydantic schema. Organization proposals must b
 | Organizations | Approved names, domains, aliases, reference IDs, asset importance |
 | Sources, source events | Authorized connector configuration, revision, archive state, and actor-attributed change history |
 | Scan jobs | Captured source configuration, progress, errors, coverage warnings, cancellation, attempt timing |
-| Documents | Distinct keyed content identity, redacted text, bounded parser metadata |
+| Documents | Distinct keyed content identity and current analysis revision/cache |
+| Document analyses | Immutable per-document revision, original input format, pipeline/profile snapshots, redacted results, reason, actor, and scan provenance |
 | Document versions | Source-path/revision lineage between different contents |
 | Source occurrences | A document at a source/path/revision with first/last observation |
-| Findings, evidence | Detector identity/version/type and exact normalized-text locations |
+| Findings, evidence | Analysis revision, detector identity/version/type, and exact normalized-text locations |
 | Incidents | Review unit, independent priority policy, attribution signals, candidate links |
-| Investigations, tool calls | Prompt/model versions, validated output, observable tool activity, usage |
-| Reviews | Append-only analyst decision history; no automatic feedback training |
+| Investigations, tool calls | Root/related analysis scope snapshot, prompt/model versions, validated output, observable tool activity, usage |
+| Reviews | Append-only decisions bound to an analysis revision; no automatic feedback training |
 | Monitoring checks | Timestamped observations, including uncertainty and disappearance |
 | Evaluation runs | Actual recorded results scoped to the publishing analyst's workspace |
 
@@ -65,4 +66,7 @@ All public entity lookups enforce workspace scope. Missing and unauthorized IDs 
 - No embeddings were added without evidence that they improve attribution or duplicate grouping.
 - No automatically public demo or default credentials were added. Owner-created workspaces and explicit source authorization are required.
 - Source configuration changes have revision checks and an audit history. Connector type/destination stay fixed; a new destination requires a new source. Edits/archive wait for active scans; new jobs execute a captured configuration. Archiving preserves evidence and blocks checks/scans until restoration. Automatic scheduling remains future work.
-- Organization changes affect new distinct content, preserving old evidence rather than silently rewriting historic assessments. Source revisioning is separate from the future versioned document-analysis model.
+- Analysis input manifests record parser/custom-rule versions, installed detector versions, extraction limits, attribution/policy versions, input format, effective exposure context, and a hash of the captured organization profiles. Rules must bump their declared version when behavior changes. Ordinary scans reuse compatible results; explicit requests create a revision even when inputs are unchanged. Successful zero-finding analyses are retained.
+- Source revisioning, analysis revisioning, and content-version lineage are separate. A no-op document-row write serializes evidence/review changes on supported databases. A document receives at most one new analysis per scan job, even when duplicate files are collected. Failed per-document transactions roll back evidence, the current pointer, and incident state together. Operational support remains one API/worker; this is not a multi-replica scheduler.
+- The current incident cache is reset to open/policy priority on a new analysis. Historical disposition is reconstructed only from that revision’s reviews. Observations remain latest-state data and are labeled accordingly in reports. A negative analysis does not close a previously existing incident.
+- Legacy analyses with unknown provenance and revisions from an incompatible redaction pipeline are restricted at detail/list/export, investigation-result, worker, and MCP boundaries. Stored snapshots remain intact. New original-byte analysis creates a fresh available revision; historical excerpts are not silently rewritten. No application endpoint can unlock legacy evidence. Rollback refuses to flatten stores containing multiple revisions; restore the pre-upgrade backup with matching code.

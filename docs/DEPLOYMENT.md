@@ -47,6 +47,8 @@ Before an update, record the current image IDs/revision and create a verified ba
 
 If an application update fails without a schema change, restore the previous tagged images and rerun checks. If a migration is incompatible, restore the pre-update database backup together with the matching prior code. Do not blindly run Alembic downgrade on a live evidence store; downgrades can destroy data. Queue jobs from old code may need recovery/retry after rollback.
 
+Versioned-analysis migration `a821f47d62bc` backfills existing documents as restricted revision 1 because their original pipeline/profile provenance is unknown. Expect existing excerpts and exports to require a fresh original-byte analysis after upgrade. API and worker must run the same code/dependency versions and detector availability, otherwise compatibility checks can restrict results. Stop both before migration and restart both afterward. The migration’s downgrade deliberately refuses once any analysis revision exceeds 1; use the pre-upgrade backup with the matching application revision for rollback. Prior downloads/backups are not retroactively redacted by this migration.
+
 ## Ongoing maintenance
 
 - Compose retention runs purge/recovery hourly. Local mode: schedule `make purge` and `make recover` or run them manually.
