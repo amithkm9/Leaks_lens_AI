@@ -1,3 +1,4 @@
+import { AnalysisPanel } from "./components/AnalysisPanel";
 import Sources from "./pages/Sources";
 import { JobList } from "./components/JobList";
 import {
@@ -21,6 +22,7 @@ import {
   Route,
   Routes,
   useParams,
+  useSearchParams,
   useLocation,
 } from "react-router-dom";
 import {
@@ -651,8 +653,13 @@ function Incidents() {
   );
 }
 function IncidentDetail() {
-  const { id } = useParams(),
-    { data, error, reload } = useData<Detail>(`/incidents/${id}`, 3500),
+  const { id } = useParams();
+  const [params, setParams] = useSearchParams();
+  const revision = params.get("analysis_revision") || "";
+  const { data, error, reload } = useData<Detail>(
+      `/incidents/${id}${revision ? `?analysis_revision=${revision}` : ""}`,
+      3500,
+    ),
     config = useData<Settings>("/settings");
   const [actionError, setActionError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -664,7 +671,10 @@ function IncidentDetail() {
     setBusy(true);
     setActionError("");
     try {
-      await post(`/incidents/${id}/investigations`, { mode });
+      await post(`/incidents/${id}/investigations`, {
+        mode,
+        analysis_revision: data?.analysis_revision,
+      });
       setNotice("Investigation queued. The result will appear below.");
       void reload();
     } catch (e) {
@@ -692,6 +702,7 @@ function IncidentDetail() {
       await post(`/incidents/${id}/reviews`, {
         ...f,
         priority: f.priority || null,
+        analysis_revision: data?.analysis_revision,
       });
       form.reset();
       setNotice("Review recorded in the audit history.");
@@ -709,6 +720,9 @@ function IncidentDetail() {
         <Loading />
       </>
     );
+  const readOnly = config.data?.read_only ?? true;
+  const decisionDisabled =
+    readOnly || !data.analysis.current || data.analysis.restricted;
   return (
     <>
       <Link className="back-link" to="/incidents">
@@ -719,13 +733,15 @@ function IncidentDetail() {
         title={data.title}
         action={
           <div className="row-actions no-print">
-            <a
-              className="button secondary"
-              href={`/api/incidents/${id}/export`}
-              download
-            >
-              <ArrowDownToLine size={16} /> Export JSON
-            </a>
+            {!data.analysis.restricted && (
+              <a
+                className="button secondary"
+                href={`/api/incidents/${id}/export?analysis_revision=${data.analysis_revision}`}
+                download
+              >
+                <ArrowDownToLine size={16} /> Export JSON
+              </a>
+            )}
             <button className="secondary" onClick={() => window.print()}>
               Print report
             </button>
@@ -741,6 +757,17 @@ function IncidentDetail() {
           {notice}
         </div>
       )}
+      <AnalysisPanel
+        key={id}
+        data={data}
+        readOnly={readOnly}
+        refresh={reload}
+        select={(value) => {
+          setNotice("");
+          setActionError("");
+          setParams(value ? { analysis_revision: value } : {});
+        }}
+      />
       <div className="detail-layout">
         <div>
           <section className="panel summary-panel">
@@ -767,7 +794,7 @@ function IncidentDetail() {
                 <summary>Why this priority?</summary>
                 <p>{data.policy.note}</p>
                 <dl className="definition-list">
-                  {Object.entries(data.policy.inputs).map(([k, v]) => (
+                  {Object.entries(data.policy.inputs || {}).map(([k, v]) => (
                     <React.Fragment key={k}>
                       <dt>{label(k)}</dt>
                       <dd>{String(v ?? "Not counted")}</dd>
@@ -781,7 +808,7 @@ function IncidentDetail() {
               </details>
             </div>
           </section>
-          {data.document.metadata_json.coverage_warnings.length > 0 && (
+          {data.document.metadata_json.coverage_warnings?.length > 0 && (
             <div className="notice warning">
               <strong>Incomplete detection coverage</strong>
               {data.document.metadata_json.coverage_warnings.map((w) => (
@@ -863,7 +890,7 @@ function IncidentDetail() {
           </section>
           <section className="panel">
             <div className="panel-heading">
-              <h2>Source observations</h2>
+              <h2>Latest source observations</h2>
             </div>
             <div className="panel-body">
               {data.occurrences.map((o) => (
@@ -883,6 +910,7 @@ function IncidentDetail() {
                   <div className="row-actions no-print">
                     <button
                       className="text-button"
+                      disabled={readOnly || o.source_archived}
                       onClick={() => recheck(o.source_id)}
                     >
                       Recheck source
@@ -984,7 +1012,11 @@ function IncidentDetail() {
                   placeholder="Record the evidence behind your decision…"
                 />
               </label>
-              <Button className="primary full" busy={busy}>
+              <Button
+                className="primary full"
+                busy={busy}
+                disabled={decisionDisabled}
+              >
                 Save review <Check size={16} />
               </Button>
               <p className="small muted">
@@ -1007,6 +1039,7 @@ function IncidentDetail() {
                 <Button
                   className="secondary full"
                   busy={busy}
+                  disabled={decisionDisabled}
                   onClick={() => investigate("offline")}
                 >
                   Run offline assessment
@@ -1014,7 +1047,7 @@ function IncidentDetail() {
                 <Button
                   className="primary full"
                   busy={busy}
-                  disabled={!config.data?.live_available}
+                  disabled={decisionDisabled || !config.data?.live_available}
                   onClick={() => investigate("live")}
                 >
                   Run live agent

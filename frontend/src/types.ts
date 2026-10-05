@@ -48,6 +48,7 @@ export type Job = {
   errors: string[];
   created_at: string;
   source_snapshot: Partial<Source>;
+  analysis_request: { reason?: string; document_id?: string };
 };
 export type Attribution = {
   organization_id: string;
@@ -94,6 +95,8 @@ export type Occurrence = {
   id: string;
   source_id: string;
   source_name: string;
+  source_archived: boolean;
+  reanalysis_available: boolean;
   access_context: string;
   locator: string;
   revision: string;
@@ -126,7 +129,22 @@ export type Investigation = {
     result: unknown;
   }[];
 };
+export type Analysis = {
+  id: string;
+  revision: number;
+  current: boolean;
+  created_at: string;
+  reason: string;
+  restricted: boolean;
+  freshness: string;
+  freshness_reasons: string[];
+  finding_count: number | null;
+};
 export type Detail = Incident & {
+  analysis_revision: number;
+  current_analysis_revision: number;
+  analysis: Analysis;
+  analyses: Analysis[];
   document: {
     name: string;
     redacted_text: string;

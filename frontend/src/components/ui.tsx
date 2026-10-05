@@ -118,6 +118,7 @@ export function useData<T>(path: string, poll = 0) {
   const controller = useRef<AbortController | null>(null);
   const reload = useCallback(async () => {
     controller.current?.abort();
+    if (!path) return;
     const request = new AbortController();
     controller.current = request;
     try {

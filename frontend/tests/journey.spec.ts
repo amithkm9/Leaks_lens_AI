@@ -23,15 +23,13 @@ test("organization → upload → scan → review → export → recheck", async
     page.getByRole("heading", { name: "Synthetic Test Organization" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Sources", exact: true }).click();
-  await page
-    .getByLabel("Upload document", { exact: true })
-    .setInputFiles({
-      name: "synthetic-test.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        "SYNTHETIC TEST DATA\ncompany,email,api_key\nSynthetic Test Organization,person@synthetic-company.test,synthetic-browser-secret-123456\n",
-      ),
-    });
+  await page.getByLabel("Upload document", { exact: true }).setInputFiles({
+    name: "synthetic-test.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "SYNTHETIC TEST DATA\ncompany,email,api_key\nSynthetic Test Organization,person@synthetic-company.test,synthetic-browser-secret-123456\n",
+    ),
+  });
   await expect(page.getByRole("status")).toContainText("Upload accepted");
   await expect(page.getByText("1 / 1 documents")).toBeVisible();
   await page.getByRole("link", { name: "Incidents", exact: true }).click();
@@ -64,6 +62,50 @@ test("organization → upload → scan → review → export → recheck", async
   await expect(page.getByRole("status")).toContainText("Source recheck queued");
   await page.getByRole("button", { name: "Run offline assessment" }).click();
   await expect(page.getByText("LLM disabled", { exact: true })).toBeVisible();
+  await page.getByText("Reanalyze original document", { exact: true }).click();
+  await page
+    .getByLabel("Reanalysis reason", { exact: true })
+    .fill("Verify a new revision preserves prior decisions.");
+  await page
+    .getByRole("button", { name: "Create new analysis", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Analysis revision 2", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No decisions recorded yet.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("LLM disabled", { exact: true })).toHaveCount(0);
+  await page.getByLabel("Analysis revision", { exact: true }).selectOption("1");
+  await expect(
+    page.getByRole("heading", { name: "Analysis revision 1", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Save review" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Run offline assessment" }),
+  ).toBeDisabled();
+  await expect(page.locator(".badge.confirmed")).toBeVisible();
+  await expect(page.getByText("LLM disabled", { exact: true })).toBeVisible();
+  const historicDownload = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Export JSON" }).click();
+  const historicStream = await (await historicDownload).createReadStream();
+  let historicBody = "";
+  for await (const chunk of historicStream!) historicBody += chunk.toString();
+  expect(JSON.parse(historicBody).report.analysis_revision).toBe(1);
+  expect(JSON.parse(historicBody).report.reviews).toHaveLength(1);
+  await page.getByLabel("Analysis revision", { exact: true }).selectOption("");
+  await expect(
+    page.getByRole("heading", { name: "Analysis revision 2", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
     path: "test-results/incident-verification.png",
     fullPage: true,

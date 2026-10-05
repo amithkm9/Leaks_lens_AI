@@ -32,6 +32,20 @@ test("edit source → scan revision → archive → restore → paginate", async
   await expect(
     scans.getByRole("row").filter({ hasText: "Source revision 2" }),
   ).toContainText("completed");
+  await row.getByRole("button", { name: "Reanalyze", exact: true }).click();
+  const reanalysis = page.getByRole("dialog", {
+    name: "Reanalyze · Updated browser repository",
+  });
+  await reanalysis
+    .getByLabel("Reanalysis reason")
+    .fill("Refresh all available source documents");
+  await reanalysis.getByRole("button", { name: "Reanalyze source" }).click();
+  await expect(reanalysis).toBeHidden();
+  await expect(
+    scans
+      .getByRole("row")
+      .filter({ hasText: "Reanalysis · Refresh all available" }),
+  ).toContainText("completed");
   await row.getByRole("button", { name: "Archive", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Source archived");
   await expect(row).toHaveCount(0);
@@ -53,7 +67,7 @@ test("edit source → scan revision → archive → restore → paginate", async
     history.getByText("restored · Revision 4", { exact: true }),
   ).toBeVisible();
   await expect(
-    history.getByText("Updated browser repository · Source revision 2"),
+    history.getByText("Updated browser repository · Source revision 2").first(),
   ).toBeVisible();
   await history.getByRole("button", { name: "Close", exact: true }).click();
 

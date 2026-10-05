@@ -45,6 +45,9 @@ export function JobList({
                   <td>
                     <span className="mono">{j.id.slice(0, 8)}</span>
                     <small>{j.phase}</small>
+                    {j.analysis_request?.reason && (
+                      <small>Reanalysis · {j.analysis_request.reason}</small>
+                    )}
                     <small>
                       {j.source_snapshot?.name || "Legacy scan"}
                       {j.source_snapshot?.revision
