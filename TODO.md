@@ -35,6 +35,8 @@ The owner requested a whole-project review and ideas for improving the project. 
 
 ### Current assessment
 
+This assessment records the pre-upgrade review. Completed changes are marked in the milestones below and recorded in PROGRESS.md.
+
 The existing product already connects collection, local detection, redaction, organization attribution, incident review, optional bounded AI, and manual source rechecks. Its strongest foundation is traceable evidence and explicit uncertainty. The next release should make repeated investigations reliable and help an analyst answer: what changed, what needs action, and what evidence supports closure?
 
 | Finding from the implementation | Consequence | Main code |
@@ -51,10 +53,11 @@ The existing product already connects collection, local detection, redaction, or
 
 ### 1. Make the existing workflow easier to maintain
 
-- [ ] Add automated checks for backend tests, Ruff, TypeScript/build, a fresh migration, and the disposable browser journey. Keep paid provider tests separately opt-in.
-- [ ] Split frontend pages, shared UI, and data hooks; extract backend routers/services as those areas change. Preserve the existing workflow through each extraction.
-- [ ] Add source editing and archiving, with a source configuration revision and an audit record. An in-flight scan must use its captured configuration; widening collection scope requires explicit source authorization.
-- [ ] Add source pagination/search and a full scan-history view. Populate upload-limit text from settings instead of the hardcoded 10 MB label.
+- [x] Add a GitHub Actions workflow for backend tests, Ruff, TypeScript/build, migration checks, and the disposable browser journeys. Paid provider tests remain opt-in. Local checks passed; remote results are recorded separately in PROGRESS.md.
+- [x] Extract the Sources page, shared UI/data hooks, and scan table; add a backend source-lifecycle service. Cancel obsolete requests when filters/pages change.
+- [ ] Continue splitting the remaining frontend pages and backend routers as those areas change.
+- [x] Add source editing, archiving/restoration, revision checks, and audit history. Scans capture their configuration; edits/archive are blocked while scans are active. Type and destination remain fixed to preserve source identity; create a new source for a different destination.
+- [x] Add source pagination/search, state filters, and paginated global/per-source scan history. Populate upload-limit text from settings. Source search is debounced.
 - [ ] Store incident filters in the URL, debounce search, and stop polling completed investigations. Group repeated evidence excerpts while preserving individual finding/citation IDs.
 
 Acceptance: the analyst can find source 51, update a source, archive it without losing evidence, and understand failed/partial scans. Existing upload, review, export, workspace-isolation, and mobile checks still pass. Automated checks run from a clean checkout without the owner's private configuration.
@@ -112,4 +115,4 @@ Acceptance: publish results against a new frozen test set with failure examples 
 
 The integration direction is supported by existing ecosystems: [Gitleaks supports baselines and SARIF reports](https://github.com/gitleaks/gitleaks), and [GitHub's SARIF ingestion uses stable rule IDs, paths, and fingerprints to track results](https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/sarif-support). These are integration opportunities, not features already implemented in LeakLens. Remediation design should also retain the distinction between an alert's resolution and action on the credential itself; see [GitHub's alert-resolution guidance](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-secret-scanning-alerts/resolving-alerts).
 
-Recommended starting slice: automated regression checks plus source editing/archiving and pagination. Then implement versioned analysis before adding scheduled monitoring. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.
+The first source-management slice is implemented. Next: finish focused workflow improvements and implement versioned analysis before adding scheduled monitoring. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.

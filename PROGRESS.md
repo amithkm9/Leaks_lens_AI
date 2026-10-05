@@ -2,6 +2,16 @@
 
 Updated 2026-10-05. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
 
+## Source management implementation (2026-10-05)
+
+- Added source editing with explicit authorization and optimistic revision checks, reversible archiving, restoration, and append-only source change history. Connector type and destination remain fixed; names, access context, and collection boundaries/limits can be updated. Active scans block edits/archive.
+- Serialized source mutations and scan submission through the source row. New scan jobs capture their configuration, and workers execute that snapshot. Occurrences retain their observed access context when source settings change. This does not introduce scheduled monitoring or claim full multi-replica operational validation.
+- Added source search, active/archived filters, pagination, per-source history, and paginated global scan history. Upload limits come from server settings. Extracted the Sources page, shared UI/data hooks, and job table; obsolete requests are cancelled during navigation.
+- Added migration `7b42a8c91d03` and `make migrate`. Existing sources receive a migration baseline; completed historical scans remain explicitly without recorded configuration. Existing evidence is retained. The SQLite regression checks upgrade, schema drift, downgrade/re-upgrade, and preservation of populated records.
+- Applied the migration to the local SQLite database after creating a private backup in ignored `.data/backups/`; Alembic reported no schema drift. No deployed PostgreSQL database was changed.
+- Added GitHub Actions checks for backend/Ruff, TypeScript/build, browser workflows, and PostgreSQL migration/schema/rollback checks. Provider credentials are not needed and live calls stay disabled. Remote CI status is recorded after the implementation push.
+- Local verification: **81 backend tests passed, 1 opt-in live-provider test skipped** (27.81 seconds); TypeScript/Vite build and Ruff passed; **2 Chrome workflows passed** (12.4 seconds). Inspected desktop/mobile Sources screenshots. Browser fixtures use a disposable database and local synthetic Git repository.
+
 ## Project review and proposed upgrades (2026-10-05)
 
 - Reviewed the data model, ingestion/detection/correlation pipeline, source connectors, API/authentication, MCP/agent boundary, frontend workflow, evaluation harness, and deployment configuration. Added a proposed staged roadmap with implementation pointers and acceptance criteria to [TODO.md](TODO.md#proposed-upgrade-roadmap--2026-10-05). Runtime application code was not changed in this review.
@@ -60,7 +70,7 @@ Near-duplicate grouping is weak: development pairwise F1 **0.407**, held-out **0
 - Remote Git collection has not been checked against an owner-authorized external repository. Private-repository authentication is unsupported. Remote pack total disk quota is not yet implemented.
 - Public deployment, DNS/HTTPS issuance, backup restoration drill, and a Linux-host end-to-end run remain unverified. Container builds ran Linux ARM64 under Docker Desktop.
 - Parser isolation has time/CPU and Linux memory limits, but no dedicated parser network namespace. Automated redaction only covers declared entities/patterns and is imperfect.
-- Source editing and scheduled source monitoring are not in the UI; manual rechecks work. Local raw-file purge must be scheduled manually. No MFA/password recovery or self-service destructive workspace deletion.
+- Scheduled source monitoring remains pending; manual rechecks work. Source editing/archiving was added on 2026-10-05 (see above). Local raw-file purge must be scheduled manually. No MFA/password recovery or self-service destructive workspace deletion.
 - Correlation considers the latest 500 documents for shingles; it is not enterprise scale. Source-run creation concurrency is designed for one API/worker, not multiple API replicas.
 - Benchmark is limited to ten text template families; broader mixed formats/unfamiliar organizations and professionally reviewed labels remain future work.
 - Demonstration fixtures/service/story, walkthrough, presentation screenshots, CV points, and public showcase are deferred as requested.

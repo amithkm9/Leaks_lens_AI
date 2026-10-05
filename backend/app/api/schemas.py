@@ -63,6 +63,15 @@ class SourceIn(BaseModel):
         return self
 
 
+class SourceUpdate(SourceIn):
+    expected_revision: int = Field(ge=1)
+
+
+class SourceArchiveIn(BaseModel):
+    archived: bool
+    expected_revision: int = Field(ge=1)
+
+
 class ReviewIn(BaseModel):
     action: Literal["confirm", "dismiss", "request_context", "remediate", "reopen", "change_priority"]
     reason: str = Field(min_length=3, max_length=3000)

@@ -4,6 +4,7 @@ from collections import OrderedDict, deque
 from threading import Lock
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,6 +17,7 @@ from app.models import (
     Session,
     Organization,
     Source,
+    SourceEvent,
     ScanJob,
     Document,
     DocumentVersion,
@@ -31,12 +33,21 @@ from app.models import (
     now,
 )
 from app.security import current_user, scoped, verify_password, create_session
-from app.api.schemas import LoginIn, OrganizationIn, SourceIn, ReviewIn, InvestigationIn
+from app.api.schemas import (
+    LoginIn,
+    OrganizationIn,
+    SourceIn,
+    SourceUpdate,
+    SourceArchiveIn,
+    ReviewIn,
+    InvestigationIn,
+)
 from app.api.middleware import RequestBodyLimitMiddleware
 from app.connectors.policy import validate_url, local_repository
 from app.detectors import availability, safe_text, sanitize
 from app.parsers import supported
 from app.workers.jobs import enqueue, run_scan
+from app.sources import snapshot, record_event, lock_source, require_current, require_active, require_idle
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 # Prevent transport libraries from logging request metadata or full provider errors.
@@ -90,7 +101,9 @@ def record(row, exclude=()):
 def page(db, model, workspace, offset=0, limit=50, extra=()):
     query = select(model).where(model.workspace_id == workspace, *extra)
     total = db.scalar(select(func.count()).select_from(query.subquery()))
-    rows = db.scalars(query.order_by(model.created_at.desc()).offset(offset).limit(limit)).all()
+    rows = db.scalars(
+        query.order_by(model.created_at.desc(), model.id.desc()).offset(offset).limit(limit)
+    ).all()
     return {"items": [record(r) for r in rows], "total": total, "offset": offset, "limit": limit}
 
 
@@ -116,7 +129,11 @@ async def security_headers(request, call_next):
 async def validation_error(request, exc):
     # Pydantic's default error includes the rejected input; never echo submitted secrets.
     return JSONResponse(
-        {"detail": safe_text("; ".join(f"{'.'.join(map(str, e['loc']))}: {e['type']}" for e in exc.errors()))},
+        {
+            "detail": safe_text(
+                "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['type']}" for e in exc.errors())
+            )
+        },
         status_code=422,
     )
 
@@ -209,12 +226,19 @@ def update_organization(
 
 @app.get("/api/sources")
 def sources(
+    q: str = Query("", max_length=200),
+    state: Literal["active", "archived", "all"] = "active",
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     user=Depends(current_user),
     db: DBSession = Depends(get_db),
 ):
-    return page(db, Source, user.workspace_id, offset, limit)
+    filters = []
+    if q.strip():
+        filters.append(Source.name.icontains(q.strip(), autoescape=True))
+    if state != "all":
+        filters.append(Source.archived_at.is_(None) if state == "active" else Source.archived_at.is_not(None))
+    return page(db, Source, user.workspace_id, offset, limit, filters)
 
 
 @app.post("/api/sources", status_code=201)
@@ -232,13 +256,74 @@ def create_source(payload: SourceIn, user=Depends(current_user), db: DBSession =
         access_context=payload.access_context,
     )
     db.add(source)
+    db.flush()
+    record_event(db, source, "created", user.id)
     db.commit()
     return record(source)
+
+
+@app.put("/api/sources/{source_id}")
+def update_source(
+    source_id: str, payload: SourceUpdate, user=Depends(current_user), db: DBSession = Depends(get_db)
+):
+    source = scoped(db, Source, source_id, user.workspace_id)
+    config = payload.config.model_dump(exclude_none=True)
+    if source.kind == "upload":
+        raise HTTPException(409, "Uploads are fixed snapshots; upload a new file to change the input")
+    if payload.kind != source.kind or any(config.get(k) != source.config.get(k) for k in ("url", "path")):
+        raise HTTPException(409, "Connect a new source to change its type or destination")
+    # Validate before holding the database write lock during DNS resolution.
+    if config.get("url"):
+        validate_url(config["url"], config)
+    else:
+        local_repository(config["path"])
+    source = lock_source(db, source_id, user.workspace_id)
+    require_current(source, payload.expected_revision)
+    require_active(source)
+    require_idle(db, source)
+    source.name = safe_text(payload.name)
+    source.config = config
+    source.access_context = payload.access_context
+    source.revision += 1
+    source.health = "unchecked"
+    source.last_checked = None
+    source.checkpoint = {}
+    record_event(db, source, "updated", user.id)
+    db.commit()
+    return record(source)
+
+
+@app.post("/api/sources/{source_id}/archive")
+def archive_source(
+    source_id: str, payload: SourceArchiveIn, user=Depends(current_user), db: DBSession = Depends(get_db)
+):
+    source = lock_source(db, source_id, user.workspace_id)
+    require_current(source, payload.expected_revision)
+    if bool(source.archived_at) != payload.archived:
+        require_idle(db, source)
+        source.archived_at = now() if payload.archived else None
+        source.revision += 1
+        record_event(db, source, "archived" if payload.archived else "restored", user.id)
+    db.commit()
+    return record(source)
+
+
+@app.get("/api/sources/{source_id}/history")
+def source_history(
+    source_id: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
+    user=Depends(current_user),
+    db: DBSession = Depends(get_db),
+):
+    scoped(db, Source, source_id, user.workspace_id)
+    return page(db, SourceEvent, user.workspace_id, offset, limit, [SourceEvent.source_id == source_id])
 
 
 @app.post("/api/sources/{source_id}/check")
 def check_source(source_id: str, user=Depends(current_user), db: DBSession = Depends(get_db)):
     source = scoped(db, Source, source_id, user.workspace_id)
+    require_active(source)
     try:
         if source.kind == "upload":
             exists = (settings().data_dir.resolve() / "uploads" / source.id).is_file()
@@ -278,6 +363,8 @@ def check_source(source_id: str, user=Depends(current_user), db: DBSession = Dep
 
 
 def submit_scan(db, source, key=None):
+    source = lock_source(db, source.id, source.workspace_id)
+    require_active(source)
     if key:
         old = db.scalar(
             select(ScanJob).where(ScanJob.workspace_id == source.workspace_id, ScanJob.idempotency_key == key)
@@ -291,7 +378,12 @@ def submit_scan(db, source, key=None):
     )
     if active:
         return active
-    job = ScanJob(workspace_id=source.workspace_id, source_id=source.id, idempotency_key=key)
+    job = ScanJob(
+        workspace_id=source.workspace_id,
+        source_id=source.id,
+        idempotency_key=key,
+        source_snapshot=snapshot(source),
+    )
     db.add(job)
     db.commit()
     try:
@@ -336,10 +428,11 @@ async def upload(file: UploadFile = File(...), user=Depends(current_user), db: D
             while chunk := await file.read(64 * 1024):
                 total += len(chunk)
                 if total > settings().max_file_bytes:
-                    raise HTTPException(413, "File exceeds the 10 MB limit")
+                    raise HTTPException(413, "File exceeds the configured upload limit")
                 output.write(chunk)
         if not total:
             raise HTTPException(400, "File is empty")
+        record_event(db, source, "created", user.id)
         db.commit()
     except Exception:
         path.unlink(missing_ok=True)
@@ -352,12 +445,17 @@ async def upload(file: UploadFile = File(...), user=Depends(current_user), db: D
 
 @app.get("/api/scans")
 def scans(
+    source_id: str = "",
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     user=Depends(current_user),
     db: DBSession = Depends(get_db),
 ):
-    return page(db, ScanJob, user.workspace_id, offset, limit)
+    if source_id:
+        scoped(db, Source, source_id, user.workspace_id)
+    return page(
+        db, ScanJob, user.workspace_id, offset, limit, [ScanJob.source_id == source_id] if source_id else []
+    )
 
 
 @app.get("/api/scans/{job_id}")
@@ -454,7 +552,7 @@ def incident_report(db, incident, workspace):
             {
                 **record(o, ("locator_hash",)),
                 "source_name": db.get(Source, o.source_id).name,
-                "access_context": db.get(Source, o.source_id).access_context,
+                "access_context": o.access_context,
             }
             for o in db.scalars(
                 select(Occurrence).where(
@@ -609,8 +707,10 @@ def overview(user=Depends(current_user), db: DBSession = Depends(get_db)):
             Incident, Incident.priority == "high", Incident.status.in_(["open", "confirmed", "needs_context"])
         ),
         "documents": count(Document),
-        "sources": count(Source),
-        "source_issues": count(Source, Source.health.in_(["error", "partial", "failed"])),
+        "sources": count(Source, Source.archived_at.is_(None)),
+        "source_issues": count(
+            Source, Source.archived_at.is_(None), Source.health.in_(["error", "partial", "failed"])
+        ),
         "recent_scans": page(db, ScanJob, w, limit=5)["items"],
         "trend": [{"date": date, "incidents": n} for date, n in reversed(trend)],
         "mode": "Live agent available"
@@ -629,6 +729,7 @@ def configuration(user=Depends(current_user)):
         "detectors": availability(),
         "limits": {
             "max_file_mb": cfg.max_file_bytes // 1024 // 1024,
+            "max_file_bytes": cfg.max_file_bytes,
             "documents_per_scan": cfg.max_documents,
             "pdf_pages": cfg.max_pdf_pages,
             "csv_rows": cfg.max_csv_rows,

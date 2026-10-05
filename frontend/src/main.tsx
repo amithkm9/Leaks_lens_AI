@@ -1,10 +1,18 @@
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import Sources from "./pages/Sources";
+import { JobList } from "./components/JobList";
+import {
+  Badge,
+  Button,
+  Empty,
+  ErrorMessage,
+  Header,
+  Loading,
+  Modal,
+  date,
+  label,
+  useData,
+} from "./components/ui";
+import React, { useEffect, useState, type FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -15,7 +23,6 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
-import * as Dialog from "@radix-ui/react-dialog";
 import {
   Activity,
   ArrowDownToLine,
@@ -27,17 +34,13 @@ import {
   FileSearch,
   Fingerprint,
   LayoutDashboard,
-  LoaderCircle,
   LogOut,
   Plus,
   Radar,
-  RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
   SlidersHorizontal,
-  Upload,
-  X,
 } from "lucide-react";
 import { api, post, setCsrf } from "./api";
 import type {
@@ -48,150 +51,8 @@ import type {
   Organization,
   Page,
   Settings,
-  Source,
 } from "./types";
 import "./style.css";
-
-const date = (value?: string | null) =>
-  value
-    ? new Date(value).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Not checked yet";
-const label = (value: string) => value.replaceAll("_", " ");
-function Badge({ value }: { value: string }) {
-  return <span className={`badge ${value}`}>{label(value)}</span>;
-}
-function ErrorMessage({ message }: { message: string }) {
-  return message ? (
-    <div className="notice error" role="alert">
-      {message}
-    </div>
-  ) : null;
-}
-function Empty({
-  icon = <FileSearch size={32} />,
-  title,
-  children,
-}: {
-  icon?: ReactNode;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="empty">
-      <div className="empty-icon">{icon}</div>
-      <h3>{title}</h3>
-      <p>{children}</p>
-    </div>
-  );
-}
-function Button({
-  children,
-  busy,
-  ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { busy?: boolean }) {
-  return (
-    <button {...props} disabled={props.disabled || busy}>
-      {busy ? <LoaderCircle className="spin" size={16} /> : null}
-      {children}
-    </button>
-  );
-}
-function Header({
-  eyebrow,
-  title,
-  children,
-  action,
-}: {
-  eyebrow: string;
-  title: string;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <header className="page-header">
-      <div>
-        <div className="eyebrow">{eyebrow}</div>
-        <h1>{title}</h1>
-        <p>{children}</p>
-      </div>
-      {action}
-    </header>
-  );
-}
-function Modal({
-  open,
-  onOpenChange,
-  title,
-  description,
-  children,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="modal-overlay" />
-        <Dialog.Content className="modal">
-          <Dialog.Title>{title}</Dialog.Title>
-          <Dialog.Description>{description}</Dialog.Description>
-          <Dialog.Close className="icon-button close" aria-label="Close">
-            <X size={20} />
-          </Dialog.Close>
-          {children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-function useData<T>(path: string, poll = 0) {
-  const [data, setData] = useState<T | null>(null),
-    [error, setError] = useState("");
-  const reload = useCallback(async () => {
-    try {
-      setData(await api<T>(path));
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [path]);
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const next = await api<T>(path);
-        if (active) {
-          setData(next);
-          setError("");
-        }
-      } catch (e) {
-        if (active) setError((e as Error).message);
-      }
-    };
-    void load();
-    const timer = poll ? setInterval(load, poll) : undefined;
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [path, poll]);
-  return { data, error, reload };
-}
-function Loading() {
-  return (
-    <div className="loading">
-      <LoaderCircle className="spin" size={20} /> Loading workspace…
-    </div>
-  );
-}
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -576,433 +437,6 @@ function Overview() {
         </>
       )}
     </>
-  );
-}
-function JobList({ jobs, refresh }: { jobs: Job[]; refresh?: () => void }) {
-  const [error, setError] = useState("");
-  async function act(id: string, action: string) {
-    try {
-      await post(`/scans/${id}/${action}`);
-      refresh?.();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  return (
-    <>
-      <ErrorMessage message={error} />
-      {!jobs.length ? (
-        <div className="empty-row">
-          No scans yet. Your scan history will appear here.
-        </div>
-      ) : (
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Scan</th>
-                <th>Status</th>
-                <th>Coverage</th>
-                <th>Started</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((j) => (
-                <tr key={j.id}>
-                  <td>
-                    <span className="mono">{j.id.slice(0, 8)}</span>
-                    <small>{j.phase}</small>
-                  </td>
-                  <td>
-                    <Badge value={j.status} />
-                  </td>
-                  <td>
-                    {j.processed} / {j.total} documents
-                  </td>
-                  <td>{date(j.created_at)}</td>
-                  <td>
-                    {j.errors.length + j.warnings.length > 0 && (
-                      <details>
-                        <summary>
-                          {j.errors.length} errors · {j.warnings.length} notices
-                        </summary>
-                        {[...j.errors, ...j.warnings].map((w, i) => (
-                          <p className="small" key={i}>
-                            {w}
-                          </p>
-                        ))}
-                      </details>
-                    )}
-                    {refresh && (
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          act(
-                            j.id,
-                            ["queued", "running"].includes(j.status)
-                              ? "cancel"
-                              : "retry",
-                          )
-                        }
-                      >
-                        {["queued", "running"].includes(j.status)
-                          ? "Cancel"
-                          : "Run again"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </>
-  );
-}
-function Sources() {
-  const sources = useData<Page<Source>>("/sources", 4000),
-    scans = useData<Page<Job>>("/scans?limit=10", 2500);
-  const [open, setOpen] = useState(false),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [message, setMessage] = useState("");
-  async function action(source: Source, kind: string) {
-    setError("");
-    try {
-      const result = await post<{ detail?: string }>(
-        `/sources/${source.id}/${kind}`,
-      );
-      setMessage(result.detail || "Scan queued. Progress appears below.");
-      void sources.reload();
-      void scans.reload();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-  async function upload(file: File | undefined) {
-    if (!file) return;
-    setBusy(true);
-    setError("");
-    const form = new FormData();
-    form.append("file", file);
-    try {
-      await api("/uploads", { method: "POST", body: form });
-      setMessage("Upload accepted. Detection is running in the background.");
-      void sources.reload();
-      void scans.reload();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <Header
-        eyebrow="WORKSPACE / SOURCES"
-        title="Start with the source."
-        action={
-          <Button className="primary" onClick={() => setOpen(true)}>
-            <Plus size={17} /> Configure source
-          </Button>
-        }
-      >
-        Collect only from repositories and document sources you are authorized
-        to investigate.
-      </Header>
-      <ErrorMessage message={error || sources.error} />
-      {message && (
-        <div role="status" className="notice success">
-          {message}
-        </div>
-      )}
-      <div className="upload-panel">
-        <div className="upload-icon">
-          <Upload size={24} />
-        </div>
-        <div>
-          <h2>Bring a document into focus</h2>
-          <p>PDF, CSV, JSON, text, or configuration files. Up to 10 MB each.</p>
-          <span className="small muted">
-            Uploads are labeled “supplied,” not publicly exposed.
-          </span>
-        </div>
-        <label className={`button secondary ${busy ? "disabled" : ""}`}>
-          {busy ? (
-            <LoaderCircle className="spin" size={16} />
-          ) : (
-            <Upload size={16} />
-          )}{" "}
-          Upload document
-          <input
-            aria-label="Upload document"
-            type="file"
-            disabled={busy}
-            className="file-input"
-            onChange={(e) => {
-              void upload(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>
-            Connected sources{" "}
-            <span className="count">{sources.data?.total || 0}</span>
-          </h2>
-          <button
-            className="icon-button"
-            aria-label="Refresh sources"
-            onClick={sources.reload}
-          >
-            <RefreshCw size={16} />
-          </button>
-        </div>
-        {!sources.data ? (
-          <Loading />
-        ) : !sources.data.items.length ? (
-          <Empty icon={<Database size={30} />} title="No sources configured">
-            Upload a document or connect your first authorized Git repository or
-            HTTP source.
-          </Empty>
-        ) : (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>Access context</th>
-                  <th>Health</th>
-                  <th>Last check</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sources.data.items.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <strong>{s.name}</strong>
-                      <small>
-                        {s.kind.toUpperCase()} ·{" "}
-                        {s.config.url || s.config.path || "Analyst upload"}
-                      </small>
-                    </td>
-                    <td>
-                      <Badge value={s.access_context} />
-                    </td>
-                    <td>
-                      <Badge value={s.health} />
-                    </td>
-                    <td>{date(s.last_checked)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="secondary small-button"
-                          onClick={() => action(s, "check")}
-                        >
-                          Check
-                        </button>
-                        <button
-                          className="primary small-button"
-                          onClick={() => action(s, "scans")}
-                        >
-                          {s.kind === "upload" ? "Reprocess" : "Scan"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>Scan activity</h2>
-          <span className="muted small">Updates automatically</span>
-        </div>
-        <JobList jobs={scans.data?.items || []} refresh={scans.reload} />
-        <ErrorMessage message={scans.error} />
-      </section>
-      <SourceModal
-        open={open}
-        close={() => {
-          setOpen(false);
-          void sources.reload();
-        }}
-      />
-    </>
-  );
-}
-function SourceModal({ open, close }: { open: boolean; close: () => void }) {
-  const [kind, setKind] = useState("http"),
-    [transport, setTransport] = useState("local"),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
-    const f = Object.fromEntries(new FormData(e.currentTarget));
-    const remote = kind === "http" || transport === "remote";
-    const config = remote
-      ? {
-          url: f.url,
-          allowed_hosts: String(f.hosts)
-            .split(",")
-            .map((x) => x.trim()),
-          path_prefixes: String(f.prefixes)
-            .split(",")
-            .map((x) => x.trim()),
-          max_depth: Number(f.depth || 1),
-          history_commits: Number(f.history || 5),
-        }
-      : { path: f.path, history_commits: Number(f.history || 5) };
-    try {
-      await post("/sources", {
-        name: f.name,
-        kind,
-        access_context: f.access_context,
-        authorized: f.authorized === "on",
-        config,
-      });
-      close();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  const remote = kind === "http" || transport === "remote";
-  return (
-    <Modal
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) close();
-      }}
-      title="Configure a source"
-      description="Define the collection boundary before scanning."
-    >
-      <form onSubmit={submit}>
-        <ErrorMessage message={error} />
-        <label>
-          Source name
-          <input
-            name="name"
-            required
-            minLength={2}
-            placeholder="Engineering repository"
-          />
-        </label>
-        <div className="form-grid">
-          <label>
-            Source type
-            <select value={kind} onChange={(e) => setKind(e.target.value)}>
-              <option value="http">HTTP documents</option>
-              <option value="git">Git repository</option>
-            </select>
-          </label>
-          <label>
-            Access context
-            <select name="access_context">
-              <option value="authorized_private">
-                Authorized private source
-              </option>
-              <option value="public_observed">
-                Publicly accessible source
-              </option>
-            </select>
-          </label>
-        </div>
-        {kind === "git" && (
-          <label>
-            Repository location
-            <select
-              value={transport}
-              onChange={(e) => setTransport(e.target.value)}
-            >
-              <option value="local">Local repository</option>
-              <option value="remote">Authorized HTTPS remote</option>
-            </select>
-          </label>
-        )}
-        {remote ? (
-          <>
-            <label>
-              Root URL
-              <input
-                name="url"
-                type="url"
-                required
-                placeholder="https://files.your-company.com/approved/"
-              />
-            </label>
-            <div className="form-grid">
-              <label>
-                Exact allowed hosts
-                <input
-                  name="hosts"
-                  required
-                  placeholder="files.your-company.com"
-                />
-              </label>
-              <label>
-                Allowed path prefixes
-                <input name="prefixes" required placeholder="/approved/" />
-              </label>
-            </div>
-            <p className="small muted">
-              Comma-separated values. Redirects must stay within these
-              boundaries. Credentials and query strings are not accepted.
-            </p>
-          </>
-        ) : (
-          <label>
-            Local repository path
-            <input
-              name="path"
-              required
-              placeholder="Absolute path within LOCAL_REPO_ROOT"
-            />
-          </label>
-        )}
-        {kind === "git" ? (
-          <label>
-            Maximum commits
-            <input
-              type="number"
-              name="history"
-              defaultValue={5}
-              min={1}
-              max={20}
-            />
-          </label>
-        ) : (
-          <label>
-            Maximum link depth
-            <input
-              type="number"
-              name="depth"
-              defaultValue={1}
-              min={0}
-              max={3}
-            />
-          </label>
-        )}
-        <label className="checkbox-label">
-          <input name="authorized" type="checkbox" required />I am authorized to
-          collect and analyze this source.
-        </label>
-        <Button className="primary full" busy={busy}>
-          Save source <Check size={16} />
-        </Button>
-      </form>
-    </Modal>
   );
 }
 function Incidents() {
@@ -1924,15 +1358,14 @@ function SettingsPage() {
   );
 }
 function Evaluation() {
-  const { data, error } =
-    useData<
-      Page<{
-        id: string;
-        dataset_version: string;
-        created_at: string;
-        results: Record<string, unknown>;
-      }>
-    >("/evaluations");
+  const { data, error } = useData<
+    Page<{
+      id: string;
+      dataset_version: string;
+      created_at: string;
+      results: Record<string, unknown>;
+    }>
+  >("/evaluations");
   return (
     <>
       <Header

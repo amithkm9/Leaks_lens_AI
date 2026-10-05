@@ -1,4 +1,4 @@
-.PHONY: setup user dev test build evaluate e2e compose-up compose-user purge recover
+.PHONY: setup user dev test build evaluate e2e compose-up compose-user purge recover migrate
 setup:
 	python3 scripts/setup.py
 	uv sync --project backend --python 3.12 --frozen
@@ -6,6 +6,8 @@ setup:
 	cd backend && .venv/bin/alembic upgrade head
 user:
 	cd backend && .venv/bin/python -m app.cli create-user
+migrate:
+	cd backend && .venv/bin/alembic upgrade head
 dev:
 	python3 scripts/dev.py
 test:

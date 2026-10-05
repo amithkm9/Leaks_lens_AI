@@ -859,6 +859,19 @@ footer {
   flex-wrap: wrap;
   margin-bottom: 21px;
 }
+.source-filters {
+  margin: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e2e8e4;
+}
+.source-actions {
+  min-width: 150px;
+  flex-wrap: wrap;
+}
+.badge.archived {
+  background: #edf0ef;
+  color: #596961;
+}
 .filters select {
   width: auto;
   font-size: 11px;

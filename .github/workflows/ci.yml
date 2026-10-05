@@ -1,0 +1,84 @@
+name: Verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LEAKLENS_RUN_LIVE_SMOKE: "0"
+      LLM_MODE: offline
+      ANTHROPIC_API_KEY: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.3"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: |
+          uv sync --project backend --python 3.12 --frozen
+          npm ci --prefix frontend
+      - name: Install checksum-verified detector
+        run: make detectors
+      - name: Check Python
+        run: backend/.venv/bin/ruff check --config backend/pyproject.toml backend/app backend/tests scripts
+      - name: Backend and migration regression tests
+        run: make test
+      - name: TypeScript and production build
+        run: make build
+      - name: Install test browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Browser workflows on a fresh database
+        run: make e2e
+
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16.10-alpine
+        env:
+          POSTGRES_USER: leaklens
+          POSTGRES_PASSWORD: synthetic-ci-only
+          POSTGRES_DB: leaklens_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leaklens -d leaklens_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://leaklens:synthetic-ci-only@127.0.0.1:5432/leaklens_ci
+      ENVIRONMENT: development
+      LLM_MODE: offline
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.3"
+      - run: uv sync --project backend --python 3.12 --frozen
+      - name: Upgrade, schema drift, and rollback checks
+        working-directory: backend
+        run: |
+          .venv/bin/alembic upgrade head
+          .venv/bin/alembic check
+          .venv/bin/alembic downgrade base
+          .venv/bin/alembic upgrade head

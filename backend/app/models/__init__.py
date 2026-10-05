@@ -59,11 +59,24 @@ class Source(Scoped, Base):
     health: Mapped[str] = mapped_column(String(30), default="unchecked")
     checkpoint: Mapped[dict] = mapped_column(JSON, default=dict)
     last_checked: Mapped[str | None] = mapped_column(String(40))
+    revision: Mapped[int] = mapped_column(default=1, server_default="1")
+    archived_at: Mapped[str | None] = mapped_column(String(40))
+
+
+class SourceEvent(Scoped, Base):
+    __tablename__ = "source_events"
+    source_id: Mapped[str] = mapped_column(ForeignKey("sources.id"), index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    action: Mapped[str] = mapped_column(String(30))
+    revision: Mapped[int]
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    __table_args__ = (UniqueConstraint("source_id", "revision"),)
 
 
 class ScanJob(Scoped, Base):
     __tablename__ = "scan_jobs"
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.id"))
+    source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     status: Mapped[str] = mapped_column(String(30), default="queued")
     phase: Mapped[str] = mapped_column(String(80), default="queued")
     processed: Mapped[int] = mapped_column(default=0)
@@ -108,6 +121,7 @@ class Occurrence(Scoped, Base):
     locator_hash: Mapped[str] = mapped_column(String(64))
     revision: Mapped[str] = mapped_column(String(80), default="current")
     state: Mapped[str] = mapped_column(String(40), default="observed")
+    access_context: Mapped[str] = mapped_column(String(30), default="supplied", server_default="supplied")
     first_observed: Mapped[str] = mapped_column(String(40), default=now)
     last_observed: Mapped[str] = mapped_column(String(40), default=now)
     last_job_id: Mapped[str] = mapped_column(String(36))

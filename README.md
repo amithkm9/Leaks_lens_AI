@@ -32,6 +32,7 @@ flowchart TD
 |---|---|
 | Define an organization | Approved names, domains, aliases, reference IDs and asset importance |
 | Add an authorized source | Uploads, local Git, HTTPS Git or constrained HTTP collection |
+| Maintain sources | Search and pagination, edit collection settings, archive/restore, and audited configuration history |
 | Scan | Background progress, cancellation, retry and explicit coverage warnings |
 | Inspect an incident | Redacted excerpts, line locations, attribution signals and priority reasons |
 | Investigate | Deterministic offline summary or optional live agent with observable tool calls |
@@ -117,6 +118,14 @@ flowchart TD
 | Optional AI | One LangGraph agent, Anthropic provider and FastMCP 3.4.7 over stdio |
 
 Local development runs **one API process** with SQLite. Compose adds the durable queue, worker and hourly raw-file retention / stale-job recovery. The same application code and migrations serve both modes.
+
+### Source management
+
+The Sources screen supports search, active/archived filters, and paginated source and scan history. Edit a source to change its name, access context, and collection limits after reaffirming authorization. Its connector type and destination remain fixed; configure a new source for a different repository or root URL. Edits and archiving wait for any active scan to finish or be cancelled.
+
+Archiving preserves incidents, reports, and history while blocking new checks/scans. Restore the source to resume manual scans. Each change records its actor and revision, and new scan jobs capture the configuration they execute. Editing access context does not rewrite previously observed evidence. Automatic schedules and versioned detector reanalysis remain planned.
+
+For an existing local installation, stop the app, run `make migrate`, and restart with `make dev`. Compose applies migrations through its migration service when updating. The source-management migration preserves existing records; old completed scans are labeled as having no recorded configuration.
 
 ## How evidence stays traceable
 
@@ -238,12 +247,13 @@ Leak_Lens_AI/
 | Command | What it checks |
 |---|---|
 | `make test` | Backend, security regressions, real MCP transport and controlled-provider integration |
+| `make migrate` | Apply pending database migrations for local development |
 | `make build` | TypeScript and production frontend build |
 | `make e2e` | Chrome analyst journey against a fresh disposable database |
 | `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
 | `make evaluate` | Development benchmark; writes measured results |
 
-**Recorded checks — 2026-09-30:** 74 backend tests passed, 1 opt-in live-provider test skipped; 1 Chrome journey passed; frontend build and Ruff passed. Locked dependency audits reported no known vulnerabilities on that date. The Docker runtime smoke was not rerun because the daemon was unavailable. See [verification records](PROGRESS.md) for details and limits.
+**Recorded checks — 2026-10-05:** 81 backend tests passed, 1 opt-in live-provider test skipped; 2 Chrome journeys passed; frontend build and Ruff passed. The tests include a populated SQLite migration regression and source lifecycle/workspace-isolation checks. GitHub Actions now defines automatic application and PostgreSQL migration checks. The prior dependency audits and Docker runtime records remain dated to their earlier runs; see [verification records](PROGRESS.md) for details and limits.
 
 Browser tests require installed Google Chrome and write verification screenshots to ignored `frontend/test-results/`. They use a disposable database, not the owner's workspace.
 

@@ -5,6 +5,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 from sqlalchemy import select, update
 from app.config import settings
 from app.db import SessionLocal
@@ -256,6 +257,7 @@ def ingest(db, job, source, item):
             previous.state = "superseded"
     occurrence.last_observed = now()
     occurrence.last_job_id = job.id
+    occurrence.access_context = source.access_context
     occurrence.state = "supplied" if source.kind == "upload" else "observed"
     db.flush()
     db.add(
@@ -302,6 +304,14 @@ def run_scan(job_id):
             return
         job = db.get(ScanJob, job_id)
         source = db.get(Source, job.source_id)
+        captured = job.source_snapshot
+        scan_source = SimpleNamespace(
+            id=source.id,
+            workspace_id=source.workspace_id,
+            kind=captured.get("kind", source.kind),
+            config=captured.get("config", source.config),
+            access_context=captured.get("access_context", source.access_context),
+        )
         job.attempts += 1
         db.commit()
         try:
@@ -312,15 +322,15 @@ def run_scan(job_id):
                 staging = Path(directory)
                 job.phase = "collecting"
                 db.commit()
-                if source.kind == "upload":
+                if scan_source.kind == "upload":
                     path = cfg.data_dir.resolve() / "uploads" / source.id
                     if not path.is_file():
                         raise ValueError("Raw upload has expired; upload the file again to reprocess")
                     collection = Collection(
-                        items=[Item(path, source.config["filename"], source.config["filename"])]
+                        items=[Item(path, scan_source.config["filename"], scan_source.config["filename"])]
                     )
-                elif source.kind == "git":
-                    collection = git.collect(source.config, staging, lambda: is_cancelled(job.id))
+                elif scan_source.kind == "git":
+                    collection = git.collect(scan_source.config, staging, lambda: is_cancelled(job.id))
                 else:
                     known = db.scalars(
                         select(Occurrence.locator)
@@ -328,7 +338,7 @@ def run_scan(job_id):
                         .limit(cfg.max_documents)
                     ).all()
                     collection = http.collect(
-                        {**source.config, "known_urls": list(known)}, staging, lambda: is_cancelled(job.id)
+                        {**scan_source.config, "known_urls": list(known)}, staging, lambda: is_cancelled(job.id)
                     )
                 job.total = len(collection.items)
                 job.errors = collection.errors
@@ -342,7 +352,7 @@ def run_scan(job_id):
                     db.commit()
                     try:
                         with db.begin_nested():
-                            warnings = ingest(db, job, source, item)
+                            warnings = ingest(db, job, scan_source, item)
                         job.warnings = list(dict.fromkeys([*job.warnings, *warnings]))
                         job.processed += 1
                     except Exception as exc:
@@ -374,7 +384,7 @@ def run_scan(job_id):
                 )
                 source.last_checked = now()
                 source.checkpoint = collection.checkpoint
-                if source.kind != "upload" and not cancelled:
+                if scan_source.kind != "upload" and not cancelled:
                     prior = db.scalars(
                         select(Occurrence).where(
                             Occurrence.source_id == source.id,
@@ -386,13 +396,13 @@ def run_scan(job_id):
                         # Absence requires a successful direct 404/410, or a complete current Git inventory.
                         direct_absent = occurrence.locator_hash in {fingerprint(u) for u in collection.absent}
                         git_absent = (
-                            source.kind == "git"
+                            scan_source.kind == "git"
                             and occurrence.revision == "current"
                             and collection.complete
                             and not job.errors
                         )
                         state = "not_observed" if direct_absent or git_absent else "unknown"
-                        if source.kind == "http" and not direct_absent:
+                        if scan_source.kind == "http" and not direct_absent:
                             state = "unknown"
                         occurrence.state = state
                         db.add(

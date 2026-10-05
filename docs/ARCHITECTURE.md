@@ -42,8 +42,8 @@ Model results must match a strict Pydantic schema. Organization proposals must b
 |---|---|
 | Workspaces, users, sessions | Access scope and hashed opaque sessions |
 | Organizations | Approved names, domains, aliases, reference IDs, asset importance |
-| Sources | Authorized connector configuration, access context, health, checkpoint |
-| Scan jobs | Progress, errors, coverage warnings, cancellation, attempt timing |
+| Sources, source events | Authorized connector configuration, revision, archive state, and actor-attributed change history |
+| Scan jobs | Captured source configuration, progress, errors, coverage warnings, cancellation, attempt timing |
 | Documents | Distinct keyed content identity, redacted text, bounded parser metadata |
 | Document versions | Source-path/revision lineage between different contents |
 | Source occurrences | A document at a source/path/revision with first/last observation |
@@ -64,4 +64,5 @@ All public entity lookups enforce workspace scope. Missing and unauthorized IDs 
 - One incident per distinct content object aggregates repeated occurrences. Candidate links preserve separate incidents and versions, so false grouping does not silently merge ownership or reviewer decisions.
 - No embeddings were added without evidence that they improve attribution or duplicate grouping.
 - No automatically public demo or default credentials were added. Owner-created workspaces and explicit source authorization are required.
-- Source configuration changes and automatic scheduled monitoring are not yet productized; manual rechecks work. Organization changes affect new distinct content, preserving old evidence rather than silently rewriting historic assessments.
+- Source configuration changes have revision checks and an audit history. Connector type/destination stay fixed; a new destination requires a new source. Edits/archive wait for active scans; new jobs execute a captured configuration. Archiving preserves evidence and blocks checks/scans until restoration. Automatic scheduling remains future work.
+- Organization changes affect new distinct content, preserving old evidence rather than silently rewriting historic assessments. Source revisioning is separate from the future versioned document-analysis model.

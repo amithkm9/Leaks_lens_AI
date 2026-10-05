@@ -13,7 +13,29 @@ export type Source = {
   access_context: string;
   health: string;
   last_checked: string | null;
-  config: { url?: string; path?: string; filename?: string };
+  revision: number;
+  archived_at: string | null;
+  config: {
+    url?: string;
+    path?: string;
+    filename?: string;
+    allowed_hosts?: string[];
+    path_prefixes?: string[];
+    max_depth?: number;
+    max_documents?: number;
+    history_commits?: number;
+  };
+};
+export type SourceEvent = {
+  id: string;
+  action: string;
+  revision: number;
+  user_id: string | null;
+  created_at: string;
+  snapshot: Pick<
+    Source,
+    "name" | "kind" | "config" | "access_context" | "revision" | "archived_at"
+  >;
 };
 export type Job = {
   id: string;
@@ -25,6 +47,7 @@ export type Job = {
   warnings: string[];
   errors: string[];
   created_at: string;
+  source_snapshot: Partial<Source>;
 };
 export type Attribution = {
   organization_id: string;
