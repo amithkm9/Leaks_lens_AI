@@ -15,19 +15,15 @@ from app.models import (
     Document,
     DocumentVersion,
     Occurrence,
-    Finding,
-    Evidence,
-    Incident,
-    Organization,
+    DocumentAnalysis,
     MonitoringCheck,
     now,
 )
 from app.connectors import Collection, Item
 from app.connectors import git, http
-from app.detectors import detect, fingerprint, safe_text
-from app.parsers import parse_file
-from app.attribution import attribute, categorize
-from app.correlation import shingles, similarity, priority
+from app.detectors import fingerprint, safe_text
+from app.analysis import get_analysis, organization_snapshot, versions
+from app.workers.analysis import analyze_document
 
 logger = logging.getLogger("leaklens.jobs")
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="leaklens-worker")
@@ -51,169 +47,52 @@ def is_cancelled(job_id):
         return not job or job.cancel_requested
 
 
-def evidence_excerpt(text, line):
-    lines = text.split("\n")
-    return "\n".join(lines[max(0, line - 2) : line + 1])[:1500]
-
-
 def ingest(db, job, source, item):
-    data = item.path.read_bytes()
-    digest = fingerprint(data.hex())
+    digest = fingerprint(item.path.read_bytes().hex())
     document = db.scalar(
         select(Document).where(Document.workspace_id == job.workspace_id, Document.content_hash == digest)
     )
-    warnings = []
     if document is None:
-        parsed = parse_file(item.path, item.name)
-        raw = parsed["text"]
-        redacted, hits, detector_warnings = detect(raw)
-        warnings = parsed["warnings"] + detector_warnings
-        organizations = db.scalars(
-            select(Organization).where(Organization.workspace_id == job.workspace_id)
-        ).all()
-        attributions = attribute(raw, organizations)
-        category = categorize(raw, item.name, hits)
         document = Document(
-            workspace_id=job.workspace_id,
-            content_hash=digest,
-            name=safe_text(item.name),
-            category=category,
-            redacted_text=redacted,
-            metadata_json={
-                **parsed["metadata"],
-                "coverage_warnings": warnings,
-                "synthetic": "synthetic" in raw[:300].lower(),
-            },
-            shingles=shingles(redacted),
+            workspace_id=job.workspace_id, content_hash=digest, name=safe_text(item.name), analysis_revision=0
         )
         db.add(document)
         db.flush()
-        for hit in hits:
-            line = raw[: hit["start"]].count("\n") + 1
-            ev = Evidence(
-                workspace_id=job.workspace_id,
-                document_id=document.id,
-                kind="detection",
-                location={
-                    "line": line,
-                    "start": hit["start"],
-                    "end": hit["end"],
-                    "unit": "normalized_text_character",
-                },
-                excerpt=evidence_excerpt(redacted, line),
-                details={"finding_type": hit["finding_type"]},
-            )
-            db.add(ev)
-            db.flush()
-            finding = Finding(
-                workspace_id=job.workspace_id,
-                document_id=document.id,
-                evidence_id=ev.id,
-                **{
-                    k: hit[k]
-                    for k in (
-                        "finding_type",
-                        "detector",
-                        "detector_version",
-                        "score",
-                        "fingerprint",
-                        "placeholder",
-                    )
-                },
-            )
-            db.add(finding)
-        for association in attributions:
-            association["evidence_ids"] = []
-            for signal in association["signals"]:
-                ev = Evidence(
-                    workspace_id=job.workspace_id,
-                    document_id=document.id,
-                    kind="attribution",
-                    location={"line": signal["line"]},
-                    excerpt=evidence_excerpt(redacted, signal["line"]),
-                    details={
-                        "signal": signal["kind"],
-                        "approved_value": signal["value"],
-                        "organization_id": association["organization_id"],
-                    },
-                )
-                db.add(ev)
-                db.flush()
-                association["evidence_ids"].append(ev.id)
-        if hits:
-            related = []
-            others = db.scalars(
-                select(Document)
-                .where(Document.workspace_id == job.workspace_id, Document.id != document.id)
-                .order_by(Document.created_at.desc())
-                .limit(500)
-            ).all()
-            for other in others:
-                score = similarity(document.shingles, other.shingles)
-                if score >= 0.6:
-                    related.append(
-                        {
-                            "document_id": other.id,
-                            "name": other.name,
-                            "method": "text_shingles",
-                            "score": round(score, 3),
-                            "caution": "Candidate relationship; identifiers and ownership require review",
-                        }
-                    )
-            fingerprints = [h["fingerprint"] for h in hits if h["finding_type"] == "SUSPECTED_SECRET"]
-            if fingerprints:
-                matches = db.scalars(
-                    select(Finding).where(
-                        Finding.workspace_id == job.workspace_id,
-                        Finding.fingerprint.in_(fingerprints),
-                        Finding.document_id != document.id,
-                    )
-                ).all()
-                for match in matches:
-                    if not any(r["document_id"] == match.document_id for r in related):
-                        other = db.get(Document, match.document_id)
-                        related.append(
-                            {
-                                "document_id": other.id,
-                                "name": other.name,
-                                "method": "keyed_secret_fingerprint",
-                                "score": None,
-                                "caution": "Shared value does not establish shared ownership",
-                            }
-                        )
-            policy = priority(hits, source.access_context, attributions, parsed["metadata"].get("rows"))
-            summary = f"{len(hits)} detector candidate(s) require review. " + (
-                "Content was supplied; public exposure is not established."
-                if source.access_context == "supplied"
-                else "Observed on an explicitly configured source; review access context."
-            )
-            if not any(a["assessment"] == "supported" for a in attributions):
-                summary += " Organization attribution is uncertain."
-            incident = Incident(
-                workspace_id=job.workspace_id,
-                document_id=document.id,
-                title=f"Review {document.name}",
-                category=category,
-                priority=policy["priority"],
-                summary=summary,
-                attribution=attributions,
-                related=related,
-                policy=policy,
-            )
-            db.add(incident)
-            for link in related:
-                peer = db.scalar(
-                    select(Incident).where(
-                        Incident.workspace_id == job.workspace_id, Incident.document_id == link["document_id"]
-                    )
-                )
-                if peer:
-                    peer.related = [
-                        *peer.related,
-                        {**link, "document_id": document.id, "name": document.name},
-                    ]
     else:
-        warnings.extend(document.metadata_json.get("coverage_warnings", []))
+        # Serialize revisions for the same content, even when found on different sources.
+        db.execute(
+            update(Document)
+            .where(Document.id == document.id)
+            .values(analysis_revision=Document.analysis_revision)
+            .execution_options(synchronize_session=False)
+        )
+        db.refresh(document)
+    analysis = get_analysis(db, document)
+    request = job.analysis_request
+    same_job = db.scalar(
+        select(DocumentAnalysis).where(
+            DocumentAnalysis.document_id == document.id, DocumentAnalysis.job_id == job.id
+        )
+    )
+    if request.get("document_id") == document.id and not same_job:
+        if request["expected_revision"] != document.analysis_revision:
+            raise ValueError(
+                "Analysis changed after this request; refresh the incident and request reanalysis again"
+            )
+    profiles = organization_snapshot(db, job.workspace_id)
+    access = source.access_context
+    if db.scalar(
+        select(Occurrence.id)
+        .where(Occurrence.document_id == document.id, Occurrence.access_context == "public_observed")
+        .limit(1)
+    ):
+        access = "public_observed"
+    manifest = versions(item.name, profiles, access)
+    if not same_job and (analysis is None or request or analysis.versions != manifest):
+        analysis = analyze_document(db, job, source, item, document, manifest, profiles)
+    else:
+        analysis = same_job or analysis
+    warnings = list(analysis.metadata_json.get("coverage_warnings", []))
     locator_hash = fingerprint(item.locator)
     occurrence = db.scalar(
         select(Occurrence).where(
@@ -270,24 +149,6 @@ def ingest(db, job, source, item):
             detail="Content supplied" if source.kind == "upload" else "Observed on this successful check",
         )
     )
-    # A newly public occurrence must upgrade the policy even when bytes already exist.
-    incident = db.scalar(select(Incident).where(Incident.document_id == document.id))
-    if (
-        incident
-        and source.access_context == "public_observed"
-        and incident.policy["inputs"]["access_context"] != "public_observed"
-    ):
-        rows = db.scalars(select(Finding).where(Finding.document_id == document.id)).all()
-        policy = priority(
-            [{"finding_type": r.finding_type, "placeholder": r.placeholder} for r in rows],
-            source.access_context,
-            incident.attribution,
-            document.metadata_json.get("rows"),
-        )
-        incident.policy = policy
-        if incident.status == "open":
-            incident.priority = policy["priority"]
-        incident.summary = f"{len(rows)} detector candidate(s). Content observed on a configured public source; ownership remains subject to review."
     return list(dict.fromkeys(warnings))
 
 
@@ -338,8 +199,26 @@ def run_scan(job_id):
                         .limit(cfg.max_documents)
                     ).all()
                     collection = http.collect(
-                        {**scan_source.config, "known_urls": list(known)}, staging, lambda: is_cancelled(job.id)
+                        {**scan_source.config, "known_urls": list(known)},
+                        staging,
+                        lambda: is_cancelled(job.id),
                     )
+                target = job.analysis_request.get("document_id")
+                if target:
+                    original = db.scalar(
+                        select(Document).where(
+                            Document.id == target, Document.workspace_id == job.workspace_id
+                        )
+                    )
+                    collection.items = [
+                        item
+                        for item in collection.items
+                        if original and fingerprint(item.path.read_bytes().hex()) == original.content_hash
+                    ]
+                    if not collection.items:
+                        raise ValueError(
+                            "Original bytes were not available on this source; upload the original file or choose another authorized source"
+                        )
                 job.total = len(collection.items)
                 job.errors = collection.errors
                 job.warnings = collection.warnings
@@ -383,8 +262,9 @@ def run_scan(job_id):
                     else job.status
                 )
                 source.last_checked = now()
-                source.checkpoint = collection.checkpoint
-                if scan_source.kind != "upload" and not cancelled:
+                if not target:
+                    source.checkpoint = collection.checkpoint
+                if scan_source.kind != "upload" and not cancelled and not target:
                     prior = db.scalars(
                         select(Occurrence).where(
                             Occurrence.source_id == source.id,

@@ -1,5 +1,7 @@
 import re
 
+ATTRIBUTION_VERSION = "attribution-v1"
+
 
 def attribute(text, organizations):
     associations = []

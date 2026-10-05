@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from app.config import settings
 
+PARSER_VERSION = "parser-v1"
+
 SUPPORTED = {
     ".pdf",
     ".csv",

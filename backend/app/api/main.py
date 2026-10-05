@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import FastAPI, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, func, text
+from sqlalchemy import select, func, text, update
 from sqlalchemy.orm import Session as DBSession
 from app.config import settings
 from app.db import get_db
@@ -21,6 +21,7 @@ from app.models import (
     ScanJob,
     Document,
     DocumentVersion,
+    DocumentAnalysis,
     Occurrence,
     Finding,
     Evidence,
@@ -41,12 +42,23 @@ from app.api.schemas import (
     SourceArchiveIn,
     ReviewIn,
     InvestigationIn,
+    SourceReanalysisIn,
+    IncidentReanalysisIn,
 )
 from app.api.middleware import RequestBodyLimitMiddleware
 from app.connectors.policy import validate_url, local_repository
 from app.detectors import availability, safe_text, sanitize
 from app.parsers import supported
 from app.workers.jobs import enqueue, run_scan
+from app.analysis import (
+    get_analysis,
+    restricted,
+    analysis_metadata,
+    organization_snapshot,
+    review_state,
+    capture_scope,
+    guard_incident_list,
+)
 from app.sources import snapshot, record_event, lock_source, require_current, require_active, require_idle
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -362,7 +374,7 @@ def check_source(source_id: str, user=Depends(current_user), db: DBSession = Dep
     return {"status": source.health, "detail": detail}
 
 
-def submit_scan(db, source, key=None):
+def submit_scan(db, source, key=None, analysis_request=None):
     source = lock_source(db, source.id, source.workspace_id)
     require_active(source)
     if key:
@@ -377,12 +389,21 @@ def submit_scan(db, source, key=None):
         select(ScanJob).where(ScanJob.source_id == source.id, ScanJob.status.in_(["queued", "running"]))
     )
     if active:
+        if analysis_request:
+            raise HTTPException(409, "Wait for the active scan to finish before requesting reanalysis")
         return active
+    if (
+        analysis_request
+        and source.kind == "upload"
+        and not (settings().data_dir.resolve() / "uploads" / source.id).is_file()
+    ):
+        raise HTTPException(409, "Raw upload has expired; upload the original file again to reanalyze it")
     job = ScanJob(
         workspace_id=source.workspace_id,
         source_id=source.id,
         idempotency_key=key,
         source_snapshot=snapshot(source),
+        analysis_request=analysis_request or {},
     )
     db.add(job)
     db.commit()
@@ -480,7 +501,81 @@ def retry_scan(job_id: str, user=Depends(current_user), db: DBSession = Depends(
     job = scoped(db, ScanJob, job_id, user.workspace_id)
     if job.status in {"queued", "running"}:
         raise HTTPException(409, "The job is still active")
-    return record(submit_scan(db, scoped(db, Source, job.source_id, user.workspace_id)))
+    source = scoped(db, Source, job.source_id, user.workspace_id)
+    if job.analysis_request:
+        require_current(source, job.source_snapshot["revision"])
+        target = job.analysis_request.get("document_id")
+        if (
+            target
+            and scoped(db, Document, target, user.workspace_id).analysis_revision
+            != job.analysis_request["expected_revision"]
+        ):
+            raise HTTPException(
+                409,
+                "The document already has a newer analysis. Open the incident to request another revision.",
+            )
+    return record(submit_scan(db, source, analysis_request=job.analysis_request))
+
+
+@app.post("/api/sources/{source_id}/reanalyses", status_code=202)
+def reanalyze_source(
+    source_id: str, payload: SourceReanalysisIn, user=Depends(current_user), db: DBSession = Depends(get_db)
+):
+    source = lock_source(db, source_id, user.workspace_id)
+    require_current(source, payload.expected_revision)
+    return record(
+        submit_scan(
+            db, source, analysis_request={"reason": safe_text(payload.reason), "requested_by": user.id}
+        )
+    )
+
+
+def current_analysis(db, incident, expected=None, require_available=True):
+    db.execute(
+        update(Document)
+        .where(Document.id == incident.document_id)
+        .values(analysis_revision=Document.analysis_revision)
+        .execution_options(synchronize_session=False)
+    )
+    document = scoped(db, Document, incident.document_id, incident.workspace_id)
+    db.refresh(document)
+    db.refresh(incident)
+    if expected is not None and expected != document.analysis_revision:
+        raise HTTPException(409, "Analysis changed. Refresh the incident before making this decision.")
+    analysis = get_analysis(db, document)
+    if require_available and restricted(analysis):
+        raise HTTPException(
+            409, "Analysis is restricted; reanalyze original bytes before reviewing or investigating"
+        )
+    return document, analysis
+
+
+@app.post("/api/incidents/{incident_id}/reanalyses", status_code=202)
+def reanalyze_incident(
+    incident_id: str,
+    payload: IncidentReanalysisIn,
+    user=Depends(current_user),
+    db: DBSession = Depends(get_db),
+):
+    incident = scoped(db, Incident, incident_id, user.workspace_id)
+    source = lock_source(db, payload.source_id, user.workspace_id)
+    document, _ = current_analysis(db, incident, payload.expected_analysis_revision, require_available=False)
+    if not db.scalar(
+        select(Occurrence.id).where(Occurrence.source_id == source.id, Occurrence.document_id == document.id)
+    ):
+        raise HTTPException(409, "Choose a source that previously supplied this document")
+    return record(
+        submit_scan(
+            db,
+            source,
+            analysis_request={
+                "document_id": document.id,
+                "expected_revision": document.analysis_revision,
+                "reason": safe_text(payload.reason),
+                "requested_by": user.id,
+            },
+        )
+    )
 
 
 @app.get("/api/incidents")
@@ -517,49 +612,101 @@ def incidents(
         from sqlalchemy import cast, String
 
         extra.append(cast(Incident.attribution, String).contains(organization))
-    return page(db, Incident, user.workspace_id, offset, limit, extra)
+    return guard_incident_list(
+        db, page(db, Incident, user.workspace_id, offset, limit, extra), user.workspace_id
+    )
 
 
-def incident_report(db, incident, workspace):
+def occurrence_record(db, occurrence):
+    source = db.get(Source, occurrence.source_id)
+    return {
+        **record(occurrence, ("locator_hash",)),
+        "source_name": source.name,
+        "source_archived": bool(source.archived_at),
+        "reanalysis_available": not source.archived_at
+        and (source.kind != "upload" or (settings().data_dir.resolve() / "uploads" / source.id).is_file()),
+    }
+
+
+def incident_report(db, incident, workspace, revision=None):
     document = scoped(db, Document, incident.document_id, workspace)
+    analysis = get_analysis(db, document, revision)
+    if analysis is None:
+        raise HTTPException(404, "Analysis revision not found")
+    blocked = restricted(analysis)
+    profiles = organization_snapshot(db, workspace)
+    status, priority = review_state(db, incident, analysis)
+    links = incident.related if analysis.revision == document.analysis_revision else analysis.related
     related = []
-    for link in incident.related:
-        peer = db.scalar(
-            select(Incident).where(
-                Incident.document_id == link["document_id"], Incident.workspace_id == workspace
+    if not blocked:
+        for link in links:
+            peer = db.scalar(
+                select(Incident).where(
+                    Incident.document_id == link["document_id"], Incident.workspace_id == workspace
+                )
             )
-        )
-        related.append({**link, "incident_id": peer.id if peer else None})
+            related.append({**link, "incident_id": peer.id if peer else None})
+    analyses = db.scalars(
+        select(DocumentAnalysis)
+        .where(DocumentAnalysis.document_id == document.id, DocumentAnalysis.workspace_id == workspace)
+        .order_by(DocumentAnalysis.revision.desc())
+    ).all()
     return {
         **record(incident),
+        "status": status,
+        "priority": priority,
+        "category": analysis.category,
+        "analysis_revision": analysis.revision,
+        "current_analysis_revision": document.analysis_revision,
+        "analysis": analysis_metadata(analysis, document.analysis_revision, profiles),
+        "analyses": [analysis_metadata(a, document.analysis_revision, profiles) for a in analyses],
+        "summary": "Analysis requires refresh before evidence can be displayed."
+        if blocked
+        else analysis.summary,
+        "attribution": [] if blocked else analysis.attribution,
+        "policy": {} if blocked else analysis.policy,
         "related": related,
-        "document": record(document, ("shingles", "content_hash")),
-        "evidence": [
+        "document": {
+            **record(document, ("shingles", "content_hash", "redacted_text", "metadata_json")),
+            "name": analysis.input_name,
+            "category": analysis.category,
+            "analysis_revision": analysis.revision,
+            "redacted_text": "" if blocked else analysis.redacted_text,
+            "metadata_json": {} if blocked else analysis.metadata_json,
+        },
+        "evidence": []
+        if blocked
+        else [
             record(e)
             for e in db.scalars(
                 select(Evidence).where(
-                    Evidence.document_id == document.id, Evidence.workspace_id == workspace
+                    Evidence.document_id == document.id,
+                    Evidence.workspace_id == workspace,
+                    Evidence.analysis_revision == analysis.revision,
                 )
             )
         ],
-        "findings": [
+        "findings": []
+        if blocked
+        else [
             record(f, ("fingerprint",))
             for f in db.scalars(
-                select(Finding).where(Finding.document_id == document.id, Finding.workspace_id == workspace)
+                select(Finding).where(
+                    Finding.document_id == document.id,
+                    Finding.workspace_id == workspace,
+                    Finding.analysis_revision == analysis.revision,
+                )
             )
         ],
         "occurrences": [
-            {
-                **record(o, ("locator_hash",)),
-                "source_name": db.get(Source, o.source_id).name,
-                "access_context": o.access_context,
-            }
+            occurrence_record(db, o)
             for o in db.scalars(
                 select(Occurrence).where(
                     Occurrence.document_id == document.id, Occurrence.workspace_id == workspace
                 )
             )
         ],
+        "observation_scope": "Latest observations, independent of the selected analysis revision",
         "versions": [
             record(v, ("locator_hash",))
             for v in db.scalars(
@@ -569,33 +716,76 @@ def incident_report(db, incident, workspace):
             )
         ],
         "reviews": [
-            record(r)
+            (
+                {**record(r), "reason": "Historical text restricted pending redaction verification"}
+                if blocked
+                else record(r)
+            )
             for r in db.scalars(
                 select(Review)
-                .where(Review.incident_id == incident.id, Review.workspace_id == workspace)
+                .where(
+                    Review.incident_id == incident.id,
+                    Review.workspace_id == workspace,
+                    Review.analysis_revision == analysis.revision,
+                )
                 .order_by(Review.created_at.desc())
             )
         ],
         "investigations": [
-            record(r)
+            investigation_record(db, r)
             for r in db.scalars(
                 select(Investigation)
-                .where(Investigation.incident_id == incident.id, Investigation.workspace_id == workspace)
+                .where(
+                    Investigation.incident_id == incident.id,
+                    Investigation.workspace_id == workspace,
+                    Investigation.analysis_revision == analysis.revision,
+                )
                 .order_by(Investigation.created_at.desc())
             )
         ],
     }
 
 
+def investigation_record(db, run):
+    incident = db.get(Incident, run.incident_id)
+    document = db.get(Document, incident.document_id)
+    blocked = restricted(get_analysis(db, document, run.analysis_revision))
+    # A result may quote any document that the agent was allowed to retrieve.
+    for doc_id, revision in run.scope_snapshot.get("analyses", {}).items():
+        peer = db.scalar(
+            select(Document).where(Document.id == doc_id, Document.workspace_id == run.workspace_id)
+        )
+        if peer is None or restricted(get_analysis(db, peer, revision)):
+            blocked = True
+    result = record(run)
+    result["restricted"] = blocked
+    if blocked:
+        result.update(
+            result={},
+            error="Historical investigation output is restricted; request a fresh analysis.",
+            scope_snapshot={},
+        )
+    return result
+
+
 @app.get("/api/incidents/{incident_id}")
-def incident_detail(incident_id: str, user=Depends(current_user), db: DBSession = Depends(get_db)):
-    return incident_report(db, scoped(db, Incident, incident_id, user.workspace_id), user.workspace_id)
+def incident_detail(
+    incident_id: str,
+    analysis_revision: int | None = Query(None, ge=1),
+    user=Depends(current_user),
+    db: DBSession = Depends(get_db),
+):
+    return incident_report(
+        db, scoped(db, Incident, incident_id, user.workspace_id), user.workspace_id, analysis_revision
+    )
 
 
 @app.post("/api/incidents/{incident_id}/reviews", status_code=201)
 def review(incident_id: str, payload: ReviewIn, user=Depends(current_user), db: DBSession = Depends(get_db)):
     incident = scoped(db, Incident, incident_id, user.workspace_id)
+    _, analysis = current_analysis(db, incident, payload.analysis_revision)
     review = Review(
+        analysis_revision=analysis.revision,
         workspace_id=user.workspace_id,
         incident_id=incident.id,
         user_id=user.id,
@@ -621,11 +811,24 @@ def review(incident_id: str, payload: ReviewIn, user=Depends(current_user), db: 
 
 
 @app.get("/api/incidents/{incident_id}/export")
-def export(incident_id: str, user=Depends(current_user), db: DBSession = Depends(get_db)):
-    report = incident_report(db, scoped(db, Incident, incident_id, user.workspace_id), user.workspace_id)
+def export(
+    incident_id: str,
+    analysis_revision: int | None = Query(None, ge=1),
+    user=Depends(current_user),
+    db: DBSession = Depends(get_db),
+):
+    report = incident_report(
+        db, scoped(db, Incident, incident_id, user.workspace_id), user.workspace_id, analysis_revision
+    )
+    if report["analysis"]["restricted"]:
+        raise HTTPException(
+            409, "This revision is restricted. Reanalyze original bytes and export the new revision."
+        )
     return JSONResponse(
-        sanitize({"schema_version": "1", "exported_at": now(), "redacted": True, "report": report}),
-        headers={"Content-Disposition": f'attachment; filename="leaklens-{incident_id}.json"'},
+        sanitize({"schema_version": "2", "exported_at": now(), "redacted": True, "report": report}),
+        headers={
+            "Content-Disposition": f'attachment; filename="leaklens-{incident_id}-r{report["analysis_revision"]}.json"'
+        },
     )
 
 
@@ -634,18 +837,23 @@ def investigate(
     incident_id: str, payload: InvestigationIn, user=Depends(current_user), db: DBSession = Depends(get_db)
 ):
     incident = scoped(db, Incident, incident_id, user.workspace_id)
+    _, analysis = current_analysis(db, incident, payload.analysis_revision)
     if payload.mode == "live" and (settings().llm_mode != "live" or not settings().anthropic_api_key):
         raise HTTPException(
             409, "Live agent is not configured; enable it with server-side environment variables"
         )
     active = db.scalar(
         select(Investigation).where(
-            Investigation.incident_id == incident.id, Investigation.status.in_(["queued", "running"])
+            Investigation.incident_id == incident.id,
+            Investigation.analysis_revision == analysis.revision,
+            Investigation.status.in_(["queued", "running"]),
         )
     )
     if active:
         return record(active)
     run = Investigation(
+        analysis_revision=analysis.revision,
+        scope_snapshot=capture_scope(db, incident, analysis),
         workspace_id=user.workspace_id,
         incident_id=incident.id,
         mode=payload.mode,
@@ -672,7 +880,8 @@ def investigation(run_id: str, user=Depends(current_user), db: DBSession = Depen
         .where(ToolCall.investigation_id == run.id, ToolCall.workspace_id == user.workspace_id)
         .order_by(ToolCall.created_at)
     ).all()
-    return {**record(run), "tool_calls": [record(c) for c in calls]}
+    result = investigation_record(db, run)
+    return {**result, "tool_calls": [] if result["restricted"] else [record(c) for c in calls]}
 
 
 @app.get("/api/monitoring/{occurrence_id}")

@@ -1,12 +1,14 @@
 """Internal MCP server. Immutable workspace/case scope comes from its parent worker."""
 
 import os
+import json
 import io
 from sqlalchemy import select
 from fastmcp import FastMCP
 from app.db import SessionLocal
 from app.models import Incident, Document, Evidence, Occurrence, MonitoringCheck, now
 from app.detectors import sanitize
+from app.analysis import get_analysis, restricted, case_for_analysis
 
 mcp = FastMCP("LeakLens scoped evidence", mask_error_details=True)
 
@@ -20,7 +22,19 @@ def scope(db):
     )
     if case is None:
         raise ValueError("Case is inaccessible")
-    allowed = {case.document_id, *(r["document_id"] for r in case.related)}
+    captured = json.loads(os.environ.get("LEAKLENS_MCP_SCOPE", "{}"))
+    if captured:
+        doc = db.get(Document, case.document_id)
+        analysis = get_analysis(db, doc, captured["analyses"][doc.id])
+        if analysis is None:
+            raise ValueError("Analysis is inaccessible")
+        case = case_for_analysis(case, analysis, captured)
+        case.related = captured.get("related", [])
+    allowed = (
+        set(captured["analyses"])
+        if captured
+        else {case.document_id, *(r["document_id"] for r in case.related)}
+    )
     return workspace, case, allowed
 
 
@@ -31,7 +45,15 @@ def document(db, document_id):
     doc = db.scalar(select(Document).where(Document.id == document_id, Document.workspace_id == workspace))
     if doc is None:
         raise ValueError("Document is inaccessible")
-    return workspace, case, doc
+    captured = json.loads(os.environ.get("LEAKLENS_MCP_SCOPE", "{}"))
+    revision = captured.get("analyses", {}).get(doc.id)
+    analysis = get_analysis(db, doc, revision)
+    manifest = (
+        json.loads(os.environ["LEAKLENS_MCP_REDACTION"]) if "LEAKLENS_MCP_REDACTION" in os.environ else None
+    )
+    if restricted(analysis, manifest):
+        raise ValueError("Analysis is restricted; reanalyze original bytes")
+    return workspace, case, analysis
 
 
 def envelope(data, evidence_ids=(), complete=True, error=None):
@@ -53,8 +75,9 @@ def get_document_metadata(document_id: str) -> dict:
         _, _, doc = document(db, document_id)
         return envelope(
             {
-                "document_id": doc.id,
-                "name": doc.name,
+                "document_id": doc.document_id,
+                "analysis_revision": doc.revision,
+                "name": doc.input_name,
                 "category": doc.category,
                 "metadata": doc.metadata_json,
             },
@@ -71,7 +94,11 @@ def get_redacted_content(document_id: str, bounded_location: int = 1) -> dict:
         workspace, _, doc = document(db, document_id)
         lines = list(io.StringIO(doc.redacted_text))
         evidence = db.scalars(
-            select(Evidence).where(Evidence.document_id == doc.id, Evidence.workspace_id == workspace)
+            select(Evidence).where(
+                Evidence.document_id == doc.document_id,
+                Evidence.workspace_id == workspace,
+                Evidence.analysis_revision == doc.revision,
+            )
         ).all()
         chunk = "".join(lines[bounded_location - 1 : bounded_location + 29])
         start = sum(len(line) for line in lines[: bounded_location - 1])
@@ -92,7 +119,8 @@ def get_redacted_content(document_id: str, bounded_location: int = 1) -> dict:
                 ids.append(item.id)
         return envelope(
             {
-                "document_id": doc.id,
+                "document_id": doc.document_id,
+                "analysis_revision": doc.revision,
                 "start_line": bounded_location,
                 "text": chunk[:6000],
                 "total_lines": len(lines),
@@ -107,10 +135,7 @@ def find_company_evidence(document_id: str) -> dict:
     """Get organization signals and uncertainty; host identity does not establish ownership."""
     with SessionLocal() as db:
         workspace, _, doc = document(db, document_id)
-        case = db.scalar(
-            select(Incident).where(Incident.document_id == doc.id, Incident.workspace_id == workspace)
-        )
-        associations = case.attribution if case else []
+        associations = doc.attribution
         return envelope(associations, [e for a in associations for e in a["evidence_ids"]])
 
 
@@ -119,12 +144,17 @@ def find_related_documents(document_id: str) -> dict:
     """Get explainable near-duplicate and repeated-secret candidate links."""
     with SessionLocal() as db:
         workspace, root_case, doc = document(db, document_id)
-        case = db.scalar(
-            select(Incident).where(Incident.document_id == doc.id, Incident.workspace_id == workspace)
-        )
-        allowed = {root_case.document_id, *(r["document_id"] for r in root_case.related)}
-        links = [r for r in case.related if r["document_id"] in allowed] if case else []
-        return envelope(links[:20], complete=not case or len(links) == len(case.related) <= 20)
+        _, _, allowed = scope(db)
+        links = root_case.related if doc.document_id == root_case.document_id else doc.related
+        if "LEAKLENS_MCP_SCOPE" not in os.environ:
+            current = db.scalar(
+                select(Incident).where(
+                    Incident.document_id == doc.document_id, Incident.workspace_id == workspace
+                )
+            )
+            links = current.related if current else []
+        visible = [r for r in links if r["document_id"] in allowed]
+        return envelope(visible[:20], complete=len(visible) == len(links) <= 20)
 
 
 @mcp.tool

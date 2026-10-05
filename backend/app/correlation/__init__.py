@@ -1,6 +1,8 @@
 import hashlib
 import re
 
+POLICY_VERSION = "priority-v1"
+
 
 def shingles(text):
     # Sort distinct 3-token shingles to make results stable and explainable.
@@ -30,7 +32,7 @@ def priority(hits, access, attributions, records):
         + important
     )
     return {
-        "version": "priority-v1",
+        "version": POLICY_VERSION,
         "priority": "high" if score >= 5 else "medium" if score >= 2 else "low",
         "score": score,
         "inputs": {

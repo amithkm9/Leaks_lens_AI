@@ -12,8 +12,9 @@ from fastmcp.client.transports import StdioTransport
 from anthropic import AsyncAnthropic
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Incident, Investigation, Evidence, Occurrence, ToolCall, now
+from app.models import Incident, Investigation, Evidence, Occurrence, ToolCall, Document, now
 from app.detectors import sanitize
+from app.analysis import get_analysis, restricted, case_for_analysis, capture_scope, redaction_manifest
 
 
 class Assessment(BaseModel):
@@ -86,6 +87,8 @@ async def live(run_id, incident, evidence, occurrences):
         "DATA_DIR": str(cfg.data_dir.resolve()),
         "LEAKLENS_MCP_WORKSPACE": incident.workspace_id,
         "LEAKLENS_MCP_CASE": incident.id,
+        "LEAKLENS_MCP_SCOPE": json.dumps(incident.scope_snapshot),
+        "LEAKLENS_MCP_REDACTION": json.dumps(redaction_manifest()),
         "FASTMCP_LOG_LEVEL": "CRITICAL",
         "LANGCHAIN_TRACING_V2": "false",
         "LANGSMITH_TRACING": "false",
@@ -281,7 +284,9 @@ def run_investigation(run_id):
         incident = db.get(Incident, run.incident_id)
         evidence = db.scalars(
             select(Evidence).where(
-                Evidence.document_id == incident.document_id, Evidence.workspace_id == run.workspace_id
+                Evidence.document_id == incident.document_id,
+                Evidence.workspace_id == run.workspace_id,
+                Evidence.analysis_revision == run.analysis_revision,
             )
         ).all()
         occurrences = db.scalars(
@@ -290,6 +295,12 @@ def run_investigation(run_id):
             )
         ).all()
         try:
+            analysis = get_analysis(db, db.get(Document, incident.document_id), run.analysis_revision)
+            if restricted(analysis):
+                raise ValueError("Analysis is restricted; reanalyze original bytes before investigating")
+            if not run.scope_snapshot:
+                run.scope_snapshot = capture_scope(db, incident, analysis)
+            incident = case_for_analysis(incident, analysis, run.scope_snapshot)
             if run.mode == "offline":
                 run.result = {
                     **offline_result(incident, evidence),
@@ -310,6 +321,7 @@ def run_investigation(run_id):
         except Exception as exc:
             run.status = "failed"
             allowed_errors = (
+                "Analysis is restricted",
                 "Unsupported citation",
                 "Unsupported claim",
                 "Unsupported organization",

@@ -77,6 +77,7 @@ class ScanJob(Scoped, Base):
     __tablename__ = "scan_jobs"
     source_id: Mapped[str] = mapped_column(ForeignKey("sources.id"))
     source_snapshot: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    analysis_request: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     status: Mapped[str] = mapped_column(String(30), default="queued")
     phase: Mapped[str] = mapped_column(String(80), default="queued")
     processed: Mapped[int] = mapped_column(default=0)
@@ -100,7 +101,32 @@ class Document(Scoped, Base):
     redacted_text: Mapped[str] = mapped_column(Text, default="")
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     shingles: Mapped[list] = mapped_column(JSON, default=list)
+    analysis_revision: Mapped[int] = mapped_column(default=0, server_default="0")
     __table_args__ = (UniqueConstraint("workspace_id", "content_hash"),)
+
+
+class DocumentAnalysis(Scoped, Base):
+    __tablename__ = "document_analyses"
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
+    revision: Mapped[int]
+    job_id: Mapped[str | None] = mapped_column(ForeignKey("scan_jobs.id"))
+    requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(Text)
+    input_name: Mapped[str] = mapped_column(String(300))
+    versions: Mapped[dict] = mapped_column(JSON)
+    organization_snapshot: Mapped[list] = mapped_column(JSON, default=list)
+    redaction_status: Mapped[str] = mapped_column(String(30), default="available")
+    category: Mapped[str] = mapped_column(String(50))
+    redacted_text: Mapped[str] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSON)
+    summary: Mapped[str] = mapped_column(Text)
+    attribution: Mapped[list] = mapped_column(JSON, default=list)
+    policy: Mapped[dict] = mapped_column(JSON, default=dict)
+    related: Mapped[list] = mapped_column(JSON, default=list)
+    __table_args__ = (
+        UniqueConstraint("document_id", "revision"),
+        UniqueConstraint("document_id", "job_id"),
+    )
 
 
 class DocumentVersion(Scoped, Base):
@@ -131,6 +157,7 @@ class Occurrence(Scoped, Base):
 class Evidence(Scoped, Base):
     __tablename__ = "evidence"
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
+    analysis_revision: Mapped[int] = mapped_column(default=1, server_default="1")
     kind: Mapped[str] = mapped_column(String(40))
     location: Mapped[dict] = mapped_column(JSON)
     excerpt: Mapped[str] = mapped_column(Text)
@@ -140,6 +167,7 @@ class Evidence(Scoped, Base):
 class Finding(Scoped, Base):
     __tablename__ = "findings"
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
+    analysis_revision: Mapped[int] = mapped_column(default=1, server_default="1")
     evidence_id: Mapped[str] = mapped_column(ForeignKey("evidence.id"))
     finding_type: Mapped[str] = mapped_column(String(60))
     detector: Mapped[str] = mapped_column(String(100))
@@ -166,6 +194,8 @@ class Incident(Scoped, Base):
 class Investigation(Scoped, Base):
     __tablename__ = "investigations"
     incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"))
+    analysis_revision: Mapped[int] = mapped_column(default=1, server_default="1")
+    scope_snapshot: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     mode: Mapped[str] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(30), default="queued")
     model: Mapped[str | None] = mapped_column(String(100))
@@ -189,6 +219,7 @@ class ToolCall(Scoped, Base):
 class Review(Scoped, Base):
     __tablename__ = "reviews"
     incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"))
+    analysis_revision: Mapped[int] = mapped_column(default=1, server_default="1")
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String(40))
     reason: Mapped[str] = mapped_column(Text)

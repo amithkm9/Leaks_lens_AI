@@ -73,6 +73,7 @@ class SourceArchiveIn(BaseModel):
 
 
 class ReviewIn(BaseModel):
+    analysis_revision: int | None = Field(default=None, ge=1)
     action: Literal["confirm", "dismiss", "request_context", "remediate", "reopen", "change_priority"]
     reason: str = Field(min_length=3, max_length=3000)
     priority: Literal["high", "medium", "low"] | None = None
@@ -85,4 +86,16 @@ class ReviewIn(BaseModel):
 
 
 class InvestigationIn(BaseModel):
+    analysis_revision: int | None = Field(default=None, ge=1)
     mode: Literal["offline", "live"] = "offline"
+
+
+class SourceReanalysisIn(BaseModel):
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class IncidentReanalysisIn(BaseModel):
+    source_id: str
+    expected_analysis_revision: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=1000)
