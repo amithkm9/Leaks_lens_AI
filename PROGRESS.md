@@ -1,6 +1,16 @@
 # Build progress
 
-Updated 2026-09-30. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+Updated 2026-10-05. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+
+## Project review and proposed upgrades (2026-10-05)
+
+- Reviewed the data model, ingestion/detection/correlation pipeline, source connectors, API/authentication, MCP/agent boundary, frontend workflow, evaluation harness, and deployment configuration. Added a proposed staged roadmap with implementation pointers and acceptance criteria to [TODO.md](TODO.md#proposed-upgrade-roadmap--2026-10-05). Runtime application code was not changed in this review.
+- Confirmed that identical content reuses stored analysis, source editing/scheduling is absent, and recurrence has no dedicated lifecycle event. Version records are exposed by the API but have no comparison view in the UI. Source pagination is missing from the frontend.
+- Audited development-label hashes without rerunning or modifying the benchmark: **120 cross-group pairs have identical content** in families 3 and 6. The current grouping target therefore differs from exact content identity. Evaluation v2 should separate those targets before correlation tuning; v1 results remain unchanged.
+- `LEAKLENS_RUN_LIVE_SMOKE=0 make test`: **74 passed, 1 skipped** in 25.55 seconds. The skipped test is the opt-in live-provider smoke.
+- `make build`: TypeScript and Vite production build passed.
+- `make e2e`: **1 Chrome journey passed** in 11.7 seconds, using a fresh disposable database. The first attempt was blocked by sandbox localhost binding; rerunning with the required execution permission passed. Inspected the resulting desktop overview, incident, and mobile QA screenshots.
+- No live-provider, external-repository, deployment, fresh dependency audit, or Docker runtime validation was performed during this review. Presentation/demo work remains deferred.
 
 ## Security review (2026-09-30)
 

@@ -60,3 +60,7 @@ Independent manual claim-support annotation is not present. Valid evidence IDs a
 B attribution emitted 100/140 development proposals and 40/60 held-out proposals, with all emitted proposals correct against the authored labels. This is a small synthetic signal-matching exercise, not calibrated performance on real organizations.
 
 The **poor duplicate result** is a substantive limitation. In the held-out set, 110 unrelated pairs were suggested and 55 related pairs were missed (35 true-positive pairs among 1,770 total pairs). Preserve those failures. Improve candidate matching using a new development set and a newly frozen independent test set, not by repeatedly adjusting thresholds against this held-out run.
+
+### Label interpretation audit — 2026-10-05
+
+A read-only audit of the development manifest found **120 pairs with identical content hashes but different authored group labels**, in families 3 (placeholders) and 6 (ambiguous prompt injection). These templates do not vary by company, while their group IDs do. Consequently, the saved duplicate metric measures recovery of authored groups, not just content identity, and some negative pairs cannot be distinguished from their text. This does not establish that the current matcher is accurate; it limits what its score can tell us. Evaluation v2 should label exact identity, related versions, shared secrets, and organization association separately before tuning matching. No v1 inputs, labels, frozen split, or result files were changed by this audit.
