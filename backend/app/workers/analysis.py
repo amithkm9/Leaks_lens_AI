@@ -15,7 +15,7 @@ def evidence_excerpt(text, line):
     return "\n".join(lines[max(0, line - 2) : line + 1])[:1500]
 
 
-def analyze_document(db, job, source, item, document, manifest, profiles):
+def analyze_document(db, job, item, document, manifest, profiles):
     parsed = parse_file(item.path, item.name)
     raw = parsed["text"]
     redacted, hits, detector_warnings = detect(raw)

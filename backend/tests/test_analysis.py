@@ -224,9 +224,9 @@ def test_reanalysis_scope_revision_archive_and_active_job_guards(client, other_c
         ).status_code
         == 409
     )
-    import app.api.main as api
+    import app.workers.jobs as jobs
 
-    monkeypatch.setattr(api, "enqueue", lambda *args: None)
+    monkeypatch.setattr(jobs, "enqueue", lambda *args: None)
     response = reanalyze(client, incident, source)
     assert response.status_code == 202
     assert reanalyze(client, incident, source).status_code == 409
@@ -303,12 +303,12 @@ def test_no_findings_revision_needs_review_and_queued_assessment_keeps_original(
         f"/api/incidents/{incident['id']}/reviews",
         json={"action": "remediate", "reason": "Original owner review"},
     )
-    import app.api.main as api
+    import app.workers.jobs as jobs
     import app.workers.analysis as worker
     from app.workers.jobs import run_scan
     from app.agent.runner import run_investigation
 
-    monkeypatch.setattr(api, "enqueue", lambda *args: None)
+    monkeypatch.setattr(jobs, "enqueue", lambda *args: None)
     queued = client.post(f"/api/incidents/{incident['id']}/investigations", json={"mode": "offline"}).json()
     monkeypatch.setattr(worker, "detect", lambda raw: ("[Controlled negative result]", [], []))
     response = reanalyze(client, incident, job["source_id"])

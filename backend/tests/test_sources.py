@@ -8,7 +8,7 @@ from conftest import upload
 
 @pytest.fixture
 def remote_source(client, monkeypatch):
-    monkeypatch.setattr("app.api.main.validate_url", lambda *args: None)
+    monkeypatch.setattr("app.api.routes.sources.validate_url", lambda *args: None)
     payload = {
         "name": "Synthetic documents",
         "kind": "http",
@@ -80,7 +80,7 @@ def test_archive_restore_preserves_evidence_and_blocks_collection(client):
 
 def test_active_scan_prevents_source_mutation(client, monkeypatch, remote_source):
     source, payload = remote_source
-    monkeypatch.setattr("app.api.main.enqueue", lambda *args: None)
+    monkeypatch.setattr("app.workers.jobs.enqueue", lambda *args: None)
     path = f"/api/sources/{source['id']}"
     job = client.post(path + "/scans").json()
     assert client.put(path, json={**payload, "expected_revision": 1}).status_code == 409
@@ -92,7 +92,7 @@ def test_active_scan_prevents_source_mutation(client, monkeypatch, remote_source
 
 def test_scan_uses_snapshot_and_edit_preserves_observed_access(client, monkeypatch, remote_source):
     source, payload = remote_source
-    monkeypatch.setattr("app.api.main.enqueue", lambda *args: None)
+    monkeypatch.setattr("app.workers.jobs.enqueue", lambda *args: None)
     path = f"/api/sources/{source['id']}"
     job = client.post(path + "/scans").json()
     assert job["source_snapshot"]["revision"] == 1

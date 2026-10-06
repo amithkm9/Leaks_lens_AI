@@ -31,23 +31,23 @@ def test_missing_account_still_checks_a_password_hash(client, monkeypatch):
 
 
 def test_login_throttle_is_bounded_and_expires(monkeypatch):
-    from app.api.main import login_attempts, throttle_login
+    from app.api.routes.auth import login_attempts, throttle_login
     from fastapi import HTTPException
 
-    monkeypatch.setattr("app.api.main.time.monotonic", lambda: 100)
+    monkeypatch.setattr("app.api.routes.auth.time.monotonic", lambda: 100)
     for i in range(4096):
         throttle_login(str(i))
     with pytest.raises(HTTPException) as failure:
         throttle_login("new-client")
     assert failure.value.status_code == 429
     assert len(login_attempts) == 4096
-    monkeypatch.setattr("app.api.main.time.monotonic", lambda: 161)
+    monkeypatch.setattr("app.api.routes.auth.time.monotonic", lambda: 161)
     throttle_login("new-client")
     assert list(login_attempts) == ["new-client"]
 
 
 def test_login_throttle_blocks_repeated_attempts():
-    from app.api.main import throttle_login
+    from app.api.routes.auth import throttle_login
     from fastapi import HTTPException
 
     for _ in range(10):
@@ -296,7 +296,9 @@ async def test_mcp_citations_require_visible_content(client, monkeypatch):
 
     incident, _ = upload(
         client,
-        "SYNTHETIC " + "x" * 6010 + "\napi_key=synthetic-hidden-secret-123456",  # gitleaks:allow -- nonfunctional test fixture
+        "SYNTHETIC "
+        + "x" * 6010
+        + "\napi_key=synthetic-hidden-secret-123456",  # gitleaks:allow -- nonfunctional test fixture
     )
     with SessionLocal() as db:
         row = db.get(Incident, incident["id"])

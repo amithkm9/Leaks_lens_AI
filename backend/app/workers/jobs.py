@@ -89,7 +89,7 @@ def ingest(db, job, source, item):
         access = "public_observed"
     manifest = versions(item.name, profiles, access)
     if not same_job and (analysis is None or request or analysis.versions != manifest):
-        analysis = analyze_document(db, job, source, item, document, manifest, profiles)
+        analysis = analyze_document(db, job, item, document, manifest, profiles)
     else:
         analysis = same_job or analysis
     warnings = list(analysis.metadata_json.get("coverage_warnings", []))

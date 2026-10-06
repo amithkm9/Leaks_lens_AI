@@ -18,7 +18,8 @@ os.environ.update(
 from app.db import Base, engine, SessionLocal  # noqa: E402
 from app.models import Workspace, User  # noqa: E402
 from app.security import passwords  # noqa: E402
-from app.api.main import app, login_attempts  # noqa: E402
+from app.api.main import app  # noqa: E402
+from app.api.routes.auth import login_attempts  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
@@ -27,9 +28,9 @@ def database(monkeypatch):
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     login_attempts.clear()
-    import app.api.main as api
+    import app.workers.jobs as jobs
 
-    monkeypatch.setattr(api, "enqueue", lambda fn, identifier: fn(identifier))
+    monkeypatch.setattr(jobs, "enqueue", lambda fn, identifier: fn(identifier))
     (ROOT / "repos").mkdir(exist_ok=True)
     with SessionLocal() as db:
         for n in (1, 2):

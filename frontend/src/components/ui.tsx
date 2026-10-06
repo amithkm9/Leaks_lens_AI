@@ -1,24 +1,8 @@
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { FileSearch, LoaderCircle, X } from "lucide-react";
-import { api } from "../api";
+import React, { type ReactNode } from "react";
+import { label } from "../lib/format";
 
-export const date = (value?: string | null) =>
-  value
-    ? new Date(value).toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Not checked yet";
-export const label = (value: string) => value.replaceAll("_", " ");
 export function Badge({ value }: { value: string }) {
   return <span className={`badge ${value}`}>{label(value)}</span>;
 }
@@ -108,51 +92,6 @@ export function Modal({
       </Dialog.Portal>
     </Dialog.Root>
   );
-}
-export function useData<T>(path: string, poll = 0) {
-  const [result, setResult] = useState<{ path: string; data: T } | null>(null);
-  const [failure, setFailure] = useState<{
-    path: string;
-    message: string;
-  } | null>(null);
-  const controller = useRef<AbortController | null>(null);
-  const reload = useCallback(async () => {
-    controller.current?.abort();
-    if (!path) return;
-    const request = new AbortController();
-    controller.current = request;
-    try {
-      const data = await api<T>(path, { signal: request.signal });
-      if (!request.signal.aborted) {
-        setResult({ path, data });
-        setFailure(null);
-      }
-    } catch (e) {
-      if (!request.signal.aborted)
-        setFailure({ path, message: (e as Error).message });
-    }
-  }, [path]);
-  useEffect(() => {
-    void reload();
-    const timer = poll ? setInterval(reload, poll) : undefined;
-    return () => {
-      controller.current?.abort();
-      clearInterval(timer);
-    };
-  }, [reload, poll]);
-  return {
-    data: result?.path === path ? result.data : null,
-    error: failure?.path === path ? failure.message : "",
-    reload,
-  };
-}
-export function useDebouncedValue(value: string, delay = 250) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
 }
 export function Loading() {
   return (

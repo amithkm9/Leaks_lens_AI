@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { post } from "../api";
+import { date } from "../lib/format";
 import type { Job } from "../types";
-import { Badge, ErrorMessage, date } from "./ui";
+import { Badge, ErrorMessage } from "./ui";
 
 export function JobList({
   jobs,

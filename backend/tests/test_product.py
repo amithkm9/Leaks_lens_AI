@@ -127,9 +127,9 @@ def test_path_traversal_and_limits(client, monkeypatch):
 
 
 def test_cancelled_job_is_not_processed(client, monkeypatch):
-    import app.api.main as api
+    import app.workers.jobs as jobs
 
-    monkeypatch.setattr(api, "enqueue", lambda *args: None)
+    monkeypatch.setattr(jobs, "enqueue", lambda *args: None)
     job = client.post("/api/uploads", files={"file": ("test.txt", b"SYNTHETIC")}).json()
     assert client.post(f"/api/scans/{job['id']}/cancel").json()["status"] == "cancelled"
     run_scan(job["id"])
