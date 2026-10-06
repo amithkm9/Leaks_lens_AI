@@ -1,6 +1,16 @@
 # Build progress
 
-Updated 2026-10-05. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+Updated 2026-10-06. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+
+## Structure cleanup and analyst workflow upgrade (2026-10-06)
+
+- Replaced the 954-line API entry point with a 33-line assembly module plus domain routers and report/scan services. Reduced the 1,451-line frontend entry point to a 5-line mount; extracted application navigation, individual screens, source dialogs, shared hooks, and formatters. Kept URLs and startup commands stable. Removed unused imports/an unused analysis parameter and consolidated duplicate pagination. Suspected unused CSS classes were verified as live status values and retained. Ruff now checks import order.
+- Added comparison of two available analysis revisions of the same document: added/removed/unchanged finding counts, revision-specific evidence links, changed inputs, organization and policy differences, and a bounded redacted-text preview. Repeated values retain occurrence counts; keyed fingerprints stay internal. Cross-workspace, restricted-history, invalid-order, and missing-revision requests are rejected. Text input/output and displayed finding entries are bounded and truncation is explicit. Different-original-file comparison remains future work.
+- Fixed stale reciprocal incident relationships after reanalysis while preserving historical relationship snapshots. Replaced per-incident document/analysis reads with one scoped join. Readiness now rejects a database missing required analysis migrations instead of relying on the users table alone.
+- Added shareable incident URLs with debounced search, active/public-material filters, reset controls, preserved queue/back navigation, and recovery from unavailable pages. Browser regression testing found and fixed a fast-typing URL/state race before delivery.
+- Grouped identical evidence excerpts at the same location while preserving every evidence ID, anchor, and citation label. Review drafts reset when the selected analysis changes. Request polling waits for the current request to settle; completed investigations/reanalysis jobs stop polling. Parent reports still enforce restrictions on cached completed results.
+- Verification: **99 backend tests passed, 1 opt-in live-provider test skipped**; **5 Chrome browser scenarios passed** (22.7 seconds), including existing source/reanalysis journeys, mobile layout, persistent filters/history, grouped citations, terminal polling, and deliberately slow responses. TypeScript/Vite production build, Ruff, Prettier, and whitespace checks passed. Inspected the resulting evidence view. No new database migration, dependency upgrade, paid provider call, deployment, or benchmark rerun was required.
+- The preceding versioned-analysis release also passed remote GitHub verification at `eba3567`: [run 37337964167](https://github.com/amithkm9/Leaks_lens_AI/actions/runs/37337964167). The cleanup release’s remote verification follows its push and is not inferred from these local results.
 
 ## Versioned analysis and reanalysis (2026-10-05)
 

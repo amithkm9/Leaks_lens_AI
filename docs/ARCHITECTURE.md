@@ -24,6 +24,12 @@ flowchart LR
   H --> API
 ```
 
+## Code organization
+
+`backend/app/api/main.py` assembles the app and installs shared errors/middleware. Domain routers in `api/routes/` own authentication, workspace settings, sources, scans, incidents, and health endpoints. Existing endpoint URLs are unchanged. `scans.py` submits work, `incidents.py` builds revision-aware reports and enforces mutation guards, `analysis.py` tracks compatibility/scope, and `comparison.py` computes bounded read-only comparisons. Workers use a single shared enqueue boundary, which tests replace with synchronous execution. Ruff enforces unused-import and import-order checks.
+
+The frontend entry point mounts `App.tsx`; screens live in `pages/`, dialogs/report components in `components/`, asynchronous data and URL state in `hooks/`, and display formatters in `lib/`. Source and incident pagination share a component. Polling schedules the next request after completion, supports terminal-state predicates, and aborts obsolete requests on navigation. Parent incident reports continue applying analysis restrictions even when a finished investigation has stopped polling.
+
 ## Processes and boundaries
 
 The API authenticates analysts, validates source configuration, writes uploads under generated IDs, and queues work. It does not run repository code. One worker performs collection, then delegates parsing to short-lived subprocesses with CPU/time limits and Linux address-space limits. Gitleaks executes as a bounded local detector process. Presidio recognizers run in the worker, using local public suffix data; no language model download or public suffix network refresh occurs.
@@ -70,3 +76,9 @@ All public entity lookups enforce workspace scope. Missing and unauthorized IDs 
 - Source revisioning, analysis revisioning, and content-version lineage are separate. A no-op document-row write serializes evidence/review changes on supported databases. A document receives at most one new analysis per scan job, even when duplicate files are collected. Failed per-document transactions roll back evidence, the current pointer, and incident state together. Operational support remains one API/worker; this is not a multi-replica scheduler.
 - The current incident cache is reset to open/policy priority on a new analysis. Historical disposition is reconstructed only from that revision’s reviews. Observations remain latest-state data and are labeled accordingly in reports. A negative analysis does not close a previously existing incident.
 - Legacy analyses with unknown provenance and revisions from an incompatible redaction pipeline are restricted at detail/list/export, investigation-result, worker, and MCP boundaries. Stored snapshots remain intact. New original-byte analysis creates a fresh available revision; historical excerpts are not silently rewritten. No application endpoint can unlock legacy evidence. Rollback refuses to flatten stores containing multiple revisions; restore the pre-upgrade backup with matching code.
+
+## Analysis comparisons and current relationships
+
+`GET /api/incidents/{id}/comparison?from_revision=N&to_revision=M` requires N < M and two available analyses of the same document. Findings match by type and internal keyed value identity, retaining repeated-occurrence counts; fingerprints never leave the backend. Added/removed entries link to evidence in the corresponding revision. Input/output text limits bound diff computation and rendering, and incomplete previews are labeled. Both revisions pass workspace and redaction restrictions before findings, text, or attribution are returned. This is an analysis comparison, not a comparison between different original files.
+
+Reanalysis retires stale reciprocal links in the current incident cache before installing its new candidate relationships. Immutable analysis snapshots retain their prior claims. Queue/dashboard restriction checks use a single scoped document/analysis join instead of per-row lookups. Readiness probes analysis tables/columns as well as authentication storage and the configured queue; a reachable database missing the analysis migration returns 503.

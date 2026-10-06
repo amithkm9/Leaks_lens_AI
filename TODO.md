@@ -55,10 +55,10 @@ The existing product already connects collection, local detection, redaction, or
 
 - [x] Add a GitHub Actions workflow for backend tests, Ruff, TypeScript/build, migration checks, and the disposable browser journeys. Paid provider tests remain opt-in. Local checks passed; remote results are recorded separately in PROGRESS.md.
 - [x] Extract the Sources page, shared UI/data hooks, and scan table; add a backend source-lifecycle service. Cancel obsolete requests when filters/pages change.
-- [ ] Continue splitting the remaining frontend pages and backend routers as those areas change.
+- [x] Split frontend screens/source dialogs, shared data hooks/formatters, domain API routers, report/scan services, and common serialization. Enforce import ordering and remove redundant imports, an unused analysis argument, and duplicate pagination logic.
 - [x] Add source editing, archiving/restoration, revision checks, and audit history. Scans capture their configuration; edits/archive are blocked while scans are active. Type and destination remain fixed to preserve source identity; create a new source for a different destination.
 - [x] Add source pagination/search, state filters, and paginated global/per-source scan history. Populate upload-limit text from settings. Source search is debounced.
-- [ ] Store incident filters in the URL, debounce search, and stop polling completed investigations. Group repeated evidence excerpts while preserving individual finding/citation IDs.
+- [x] Store incident filters in the URL, debounce search, preserve queue/back navigation, recover invalid offsets, and stop polling completed investigations. Allow slow responses to finish. Group repeated excerpts while preserving individual citation IDs and labels.
 
 Acceptance: the analyst can find source 51, update a source, archive it without losing evidence, and understand failed/partial scans. Existing upload, review, export, workspace-isolation, and mobile checks still pass. Automated checks run from a clean checkout without the owner's private configuration.
 
@@ -86,7 +86,8 @@ Acceptance: an unchanged repeat scan generates no duplicate alert; a newly obser
 
 - [ ] Add remediation tasks with an accountable owner, due date, action taken, supporting evidence, and verification status. Start with the existing workspace users; invitations/roles are a later team feature.
 - [ ] Show a combined timeline of scans, content changes, investigations, reviews, and follow-up checks.
-- [ ] Add a redacted version comparison showing added/removed findings and changed nonsecret context. Do not reconstruct masked values.
+- [x] Compare analysis revisions of the same content with added/removed/unchanged findings, attribution/policy differences, restricted-history guards, and bounded redacted text previews.
+- [ ] Extend comparison to different content versions at a source path; include source lineage and never reconstruct masked values.
 - [ ] Distinguish analyst-recorded remediation, source no longer observed, and credential rotation/revocation confirmation. Recurrence should create an explicit review event without silently overwriting the analyst's prior decision.
 - [ ] Add actionable overview metrics: aging unresolved incidents, overdue follow-ups, recurring findings, and source coverage/failures, with clear denominators.
 
@@ -115,4 +116,4 @@ Acceptance: publish results against a new frozen test set with failure examples 
 
 The integration direction is supported by existing ecosystems: [Gitleaks supports baselines and SARIF reports](https://github.com/gitleaks/gitleaks), and [GitHub's SARIF ingestion uses stable rule IDs, paths, and fingerprints to track results](https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/sarif-support). These are integration opportunities, not features already implemented in LeakLens. Remediation design should also retain the distinction between an alert's resolution and action on the credential itself; see [GitHub's alert-resolution guidance](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-secret-scanning-alerts/resolving-alerts).
 
-Source management and versioned analysis are implemented. Next: build opt-in scheduled monitoring with durable source claims and change events, then complete the remaining focused workflow improvements. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.
+Source management, versioned analysis, analysis comparison, and the focused workflow/structure cleanup are implemented. Next: build opt-in scheduled monitoring with durable source claims and change events. Different-content comparison and remediation ownership remain later milestones. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.

@@ -157,9 +157,15 @@ flowchart TD
 
 Content and secret identities use **HMAC-SHA256**. Similarity uses hashed shingles of redacted text. Priority comes from an explainable code policy; the model cannot overwrite it.
 
+### Incident workflow
+
+Incident search, filters, and pagination are stored in the URL. Bookmark a view or return from a detail page to the same queue. Search updates are debounced; invalid page offsets recover to an available page. Repeated excerpts share a display block while every evidence ID and citation anchor remains accessible. Finished AI assessments stop polling; slow requests finish before the next poll begins. A newly loaded analysis resets an unfinished review form so a draft decision is not silently carried to another revision.
+
 ### Reanalysis and history
 
 Open an incident’s **Analysis revision** selector to inspect earlier evidence, reviews, and AI investigations. Choose **Reanalyze original document**, select an available authorized source, and record a reason. **Sources → Reanalyze** collects all available documents within that source’s limits, including documents with no previous findings. Compatible ordinary scans reuse results; changed analysis inputs automatically produce a fresh revision when original content is observed again.
+
+Use **Compare analyses** to compare the selected revision with an earlier available revision. The report shows added/removed/unchanged findings, changed inputs, attribution and policy changes, and a redacted-text preview. It compares analyses of the **same original content**; comparison of different content versions at a source path remains planned. Restricted revisions cannot be compared. Preview limits are explicit: 100 added/removed entries, and 400 lines / 24,000 characters of text; counts include all findings. A changed result does not prove removal or remediation.
 
 Each new analysis starts an open review with its calculated priority. Earlier confirmations, dismissals, remediation decisions, and priority overrides remain attached to their original revision. A result with no findings does not automatically establish remediation or complete detection coverage. Observation history always describes the latest source checks, independently of the selected analysis revision.
 
@@ -227,7 +233,11 @@ Configure both `INPUT_PRICE_PER_MILLION` and `OUTPUT_PRICE_PER_MILLION` to enabl
 Leak_Lens_AI/
 ├── backend/
 │   ├── app/
-│   │   ├── api/             # Routes, request schemas, request-size middleware
+│   │   ├── api/             # Application assembly, domain routers, schemas, middleware
+│   │   ├── analysis.py      # Analysis provenance, freshness, and revision scope
+│   │   ├── incidents.py     # Revision-aware reports and mutation guards
+│   │   ├── comparison.py    # Bounded analysis comparisons
+│   │   ├── scans.py         # Scan submission and queue failure handling
 │   │   ├── connectors/      # Authorized Git / HTTP collection and URL policy
 │   │   ├── parsers/         # Format extraction and subprocess limits
 │   │   ├── detectors/       # Secret / personal-data detection and redaction
@@ -241,7 +251,12 @@ Leak_Lens_AI/
 │   ├── migrations/         # Alembic database migrations
 │   └── tests/              # Backend, security, MCP and integration checks
 ├── frontend/
-│   ├── src/                # React screens, API client, types and styles
+│   ├── src/
+│   │   ├── App.tsx         # Authentication and application navigation
+│   │   ├── pages/          # Individual analyst screens
+│   │   ├── components/     # Shared UI, source dialogs, evidence and comparisons
+│   │   ├── hooks/          # Request lifecycle, polling, and URL filters
+│   │   └── lib/            # Display formatters
 │   └── tests/              # Playwright analyst journey
 ├── evaluation/             # Synthetic inputs, ground truth and saved results
 ├── scripts/                # Setup, development, detector install and smoke checks
@@ -252,7 +267,7 @@ Leak_Lens_AI/
 └── Makefile                # Common setup, run and verification commands
 ```
 
-**Suggested reading path:** [scan pipeline](backend/app/workers/jobs.py) → [data model](backend/app/models/__init__.py) → [API](backend/app/api/main.py) → [agent](backend/app/agent/runner.py) → [interface](frontend/src/main.tsx).
+**Suggested reading path:** [scan pipeline](backend/app/workers/jobs.py) → [data model](backend/app/models/__init__.py) → [API routers](backend/app/api/routes) → [reports](backend/app/incidents.py) → [agent](backend/app/agent/runner.py) → [interface](frontend/src/App.tsx).
 
 ## Verification
 
@@ -265,7 +280,7 @@ Leak_Lens_AI/
 | `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
 | `make evaluate` | Development benchmark; writes measured results |
 
-**Recorded checks — 2026-10-05:** Versioned analysis extends the backend and browser regression coverage with preserved evidence/decisions, stale requests, original-byte reacquisition, restricted historical output, pinned MCP reads, and populated migration checks. Exact current counts and CI results are recorded in [PROGRESS.md](PROGRESS.md). GitHub Actions runs application and PostgreSQL migration checks. The prior dependency audits and Docker runtime records remain dated to their earlier runs; see [verification records](PROGRESS.md) for details and limits.
+**Recorded checks — 2026-10-06:** 99 backend tests passed, 1 opt-in live-provider test skipped, and 5 Chrome browser scenarios passed. TypeScript/build, Ruff (including import ordering), formatting, and whitespace checks passed. Coverage now includes analysis comparison boundaries, relationship retirement, bounded incident-list queries, readiness on an outdated schema, filter/history navigation, citation grouping, and slow/terminal request handling. CI and earlier audit/runtime records remain attributed to their actual runs in [PROGRESS.md](PROGRESS.md).
 
 Browser tests require installed Google Chrome and write verification screenshots to ignored `frontend/test-results/`. They use a disposable database, not the owner's workspace.
 
