@@ -2,12 +2,13 @@
 
 import logging
 from contextlib import asynccontextmanager
+
+from app.api.errors import security_headers, validation_error, value_error
+from app.api.middleware import RequestBodyLimitMiddleware
+from app.api.routes import auth, incidents, scans, sources, system, workspace
+from app.config import settings
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from app.config import settings
-from app.api.middleware import RequestBodyLimitMiddleware
-from app.api.errors import security_headers, validation_error, value_error
-from app.api.routes import auth, system, workspace, sources, scans, incidents
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 # Transport libraries must not log provider errors or sensitive request metadata.

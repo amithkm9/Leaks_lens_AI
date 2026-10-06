@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+
 from app.config import settings
 
 PARSER_VERSION = "parser-v1"

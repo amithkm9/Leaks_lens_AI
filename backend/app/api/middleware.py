@@ -1,8 +1,8 @@
 """Bound request streams before multipart files can exhaust temporary storage."""
 
+from app.config import settings
 from starlette.formparsers import MultiPartException
 from starlette.responses import JSONResponse
-from app.config import settings
 
 
 class RequestBodyTooLarge(MultiPartException):

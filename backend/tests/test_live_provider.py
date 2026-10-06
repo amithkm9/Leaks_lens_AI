@@ -1,11 +1,12 @@
 """Opt-in billed smoke test; never enabled by the ordinary test command."""
 
 import os
+
 import pytest
+from app.agent.runner import run_investigation
 from app.config import settings
 from app.db import SessionLocal
 from app.models import Incident, Investigation
-from app.agent.runner import run_investigation
 from conftest import upload
 
 

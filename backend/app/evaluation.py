@@ -8,11 +8,13 @@ import statistics
 import time
 from pathlib import Path
 from types import SimpleNamespace
+
 from sqlalchemy import select
+
 from app.attribution import attribute
 from app.correlation import shingles, similarity
-from app.detectors import detect, availability
 from app.db import SessionLocal
+from app.detectors import availability, detect
 from app.models import EvaluationRun, User, now
 
 ROOT = Path(__file__).resolve().parents[2] / "evaluation"

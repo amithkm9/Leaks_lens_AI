@@ -6,24 +6,24 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
-from sqlalchemy import select, update
+
+from app.analysis import get_analysis, organization_snapshot, versions
 from app.config import settings
+from app.connectors import Collection, Item, git, http
 from app.db import SessionLocal
+from app.detectors import fingerprint, safe_text
 from app.models import (
+    Document,
+    DocumentAnalysis,
+    DocumentVersion,
+    MonitoringCheck,
+    Occurrence,
     ScanJob,
     Source,
-    Document,
-    DocumentVersion,
-    Occurrence,
-    DocumentAnalysis,
-    MonitoringCheck,
     now,
 )
-from app.connectors import Collection, Item
-from app.connectors import git, http
-from app.detectors import fingerprint, safe_text
-from app.analysis import get_analysis, organization_snapshot, versions
 from app.workers.analysis import analyze_document
+from sqlalchemy import select, update
 
 logger = logging.getLogger("leaklens.jobs")
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="leaklens-worker")

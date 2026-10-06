@@ -3,10 +3,8 @@
 import json
 import sys
 from pathlib import Path
+
 import pytest
-from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
-from sqlalchemy import select, func
 from app import detectors
 from app.analysis import get_analysis, redaction_manifest
 from app.config import settings
@@ -22,6 +20,9 @@ from app.models import (
     ToolCall,
 )
 from conftest import upload
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
+from sqlalchemy import func, select
 
 
 def detail(client, incident, revision=None):
@@ -274,9 +275,9 @@ async def test_real_mcp_pins_original_evidence_after_reanalysis(client):
 def test_targeted_reanalysis_does_not_mark_unrelated_occurrences_absent(client, monkeypatch, tmp_path):
     first, job = upload(client)
     second, _ = upload(client, "SYNTHETIC\napi_key=synthetic-other-secret-789012")
-    from app.models import Source
-    from app.connectors import Collection, Item
     import app.workers.jobs as worker
+    from app.connectors import Collection, Item
+    from app.models import Source
 
     with SessionLocal() as db:
         source = db.get(Source, job["source_id"])
@@ -303,10 +304,10 @@ def test_no_findings_revision_needs_review_and_queued_assessment_keeps_original(
         f"/api/incidents/{incident['id']}/reviews",
         json={"action": "remediate", "reason": "Original owner review"},
     )
-    import app.workers.jobs as jobs
     import app.workers.analysis as worker
-    from app.workers.jobs import run_scan
+    import app.workers.jobs as jobs
     from app.agent.runner import run_investigation
+    from app.workers.jobs import run_scan
 
     monkeypatch.setattr(jobs, "enqueue", lambda *args: None)
     queued = client.post(f"/api/incidents/{incident['id']}/investigations", json={"mode": "offline"}).json()
@@ -327,9 +328,9 @@ def test_no_findings_revision_needs_review_and_queued_assessment_keeps_original(
 
 def test_repeated_bytes_within_forced_source_scan_create_one_revision(client, monkeypatch):
     incident, job = upload(client)
-    from app.models import Source
-    from app.connectors import Collection, Item
     import app.workers.jobs as worker
+    from app.connectors import Collection, Item
+    from app.models import Source
 
     with SessionLocal() as db:
         db.get(Source, job["source_id"]).kind = "git"

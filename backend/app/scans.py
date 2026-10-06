@@ -2,12 +2,12 @@
 
 from fastapi import HTTPException
 from sqlalchemy import select
+
 from app.config import settings
 from app.models import (
     ScanJob,
 )
-from app.sources import snapshot, lock_source, require_active
-
+from app.sources import lock_source, require_active, snapshot
 from app.workers import jobs
 
 

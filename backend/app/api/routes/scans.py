@@ -1,25 +1,24 @@
 from pathlib import Path
-from fastapi import Depends, HTTPException, Request, UploadFile, File, Query
-from sqlalchemy.orm import Session as DBSession
-from app.config import settings
-from app.db import get_db
-from app.models import (
-    Source,
-    ScanJob,
-    Document,
-    now,
-)
-from app.security import current_user, scoped
+
 from app.api.schemas import (
     SourceReanalysisIn,
 )
+from app.config import settings
+from app.db import get_db
 from app.detectors import safe_text
+from app.models import (
+    Document,
+    ScanJob,
+    Source,
+    now,
+)
 from app.parsers import supported
-from app.sources import record_event, lock_source, require_current
-
-from fastapi import APIRouter
-from app.serialization import record, page
 from app.scans import submit_scan
+from app.security import current_user, scoped
+from app.serialization import page, record
+from app.sources import lock_source, record_event, require_current
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["scans"])
 

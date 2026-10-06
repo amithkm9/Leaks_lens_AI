@@ -2,28 +2,28 @@
 
 from fastapi import HTTPException
 from sqlalchemy import select, update
-from app.config import settings
-from app.models import (
-    Source,
-    Document,
-    DocumentVersion,
-    DocumentAnalysis,
-    Occurrence,
-    Finding,
-    Evidence,
-    Incident,
-    Investigation,
-    Review,
-)
-from app.security import scoped
+
 from app.analysis import (
-    get_analysis,
-    restricted,
     analysis_metadata,
+    get_analysis,
     organization_snapshot,
+    restricted,
     review_state,
 )
-
+from app.config import settings
+from app.models import (
+    Document,
+    DocumentAnalysis,
+    DocumentVersion,
+    Evidence,
+    Finding,
+    Incident,
+    Investigation,
+    Occurrence,
+    Review,
+    Source,
+)
+from app.security import scoped
 from app.serialization import record
 
 

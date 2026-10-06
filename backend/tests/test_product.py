@@ -1,10 +1,11 @@
 import json
-from sqlalchemy import select, func
-from app.db import SessionLocal
-from app.models import Document, Occurrence, Finding
+
 from app.config import settings
+from app.db import SessionLocal
+from app.models import Document, Finding, Occurrence
 from app.workers.jobs import run_scan
 from conftest import upload
+from sqlalchemy import func, select
 
 
 def test_upload_review_export_offline(client, caplog):

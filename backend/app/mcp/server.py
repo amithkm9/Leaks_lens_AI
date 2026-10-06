@@ -1,14 +1,15 @@
 """Internal MCP server. Immutable workspace/case scope comes from its parent worker."""
 
-import os
-import json
 import io
-from sqlalchemy import select
-from fastmcp import FastMCP
+import json
+import os
+
+from app.analysis import case_for_analysis, get_analysis, restricted
 from app.db import SessionLocal
-from app.models import Incident, Document, Evidence, Occurrence, MonitoringCheck, now
 from app.detectors import sanitize
-from app.analysis import get_analysis, restricted, case_for_analysis
+from app.models import Document, Evidence, Incident, MonitoringCheck, Occurrence, now
+from fastmcp import FastMCP
+from sqlalchemy import select
 
 mcp = FastMCP("LeakLens scoped evidence", mask_error_details=True)
 

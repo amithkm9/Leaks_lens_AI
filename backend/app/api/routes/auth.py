@@ -1,21 +1,20 @@
 import time
 from collections import OrderedDict, deque
 from threading import Lock
-from fastapi import Depends, HTTPException, Request, Response
-from sqlalchemy import select
-from sqlalchemy.orm import Session as DBSession
-from app.config import settings
-from app.db import get_db
-from app.models import (
-    User,
-    Session,
-)
-from app.security import current_user, verify_password, create_session
+
 from app.api.schemas import (
     LoginIn,
 )
-
-from fastapi import APIRouter
+from app.config import settings
+from app.db import get_db
+from app.models import (
+    Session,
+    User,
+)
+from app.security import create_session, current_user, verify_password
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["auth"])
 login_attempts = OrderedDict()

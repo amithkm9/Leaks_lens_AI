@@ -1,37 +1,36 @@
-from fastapi import Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
-from sqlalchemy import select
-from sqlalchemy.orm import Session as DBSession
-from app.config import settings
-from app.db import get_db
-from app.models import (
-    Organization,
-    Occurrence,
-    Incident,
-    Investigation,
-    ToolCall,
-    Review,
-    MonitoringCheck,
-    now,
-)
-from app.security import current_user, scoped
-from app.api.schemas import (
-    ReviewIn,
-    InvestigationIn,
-    IncidentReanalysisIn,
-)
-from app.detectors import safe_text, sanitize
 from app.analysis import (
     capture_scope,
     guard_incident_list,
 )
-from app.sources import lock_source
-
-from fastapi import APIRouter
-from app.serialization import record, page
-from app.scans import submit_scan
+from app.api.schemas import (
+    IncidentReanalysisIn,
+    InvestigationIn,
+    ReviewIn,
+)
+from app.comparison import compare_analyses
+from app.config import settings
+from app.db import get_db
+from app.detectors import safe_text, sanitize
 from app.incidents import current_analysis, incident_report, investigation_record
+from app.models import (
+    Incident,
+    Investigation,
+    MonitoringCheck,
+    Occurrence,
+    Organization,
+    Review,
+    ToolCall,
+    now,
+)
+from app.scans import submit_scan
+from app.security import current_user, scoped
+from app.serialization import page, record
+from app.sources import lock_source
 from app.workers import jobs
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["incidents"])
 
@@ -95,7 +94,7 @@ def incidents(
     if organization:
         # Portable JSON search for a validated UUID, including SQLite local mode.
         scoped(db, Organization, organization, user.workspace_id)
-        from sqlalchemy import cast, String
+        from sqlalchemy import String, cast
 
         extra.append(cast(Incident.attribution, String).contains(organization))
     return guard_incident_list(
@@ -228,4 +227,17 @@ def monitoring(occurrence_id: str, user=Depends(current_user), db: DBSession = D
         user.workspace_id,
         limit=100,
         extra=[MonitoringCheck.occurrence_id == occurrence_id],
+    )
+
+
+@router.get("/incidents/{incident_id}/comparison")
+def comparison(
+    incident_id: str,
+    from_revision: int = Query(..., ge=1),
+    to_revision: int = Query(..., ge=1),
+    user=Depends(current_user),
+    db: DBSession = Depends(get_db),
+):
+    return compare_analyses(
+        db, scoped(db, Incident, incident_id, user.workspace_id), from_revision, to_revision
     )

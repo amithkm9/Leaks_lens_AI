@@ -4,17 +4,18 @@ import sys
 import time
 from pathlib import Path
 from typing import Literal, TypedDict
-from pydantic import BaseModel, Field, ConfigDict
-from sqlalchemy import select
-from langgraph.graph import StateGraph, START, END
-from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
+
 from anthropic import AsyncAnthropic
+from app.analysis import capture_scope, case_for_analysis, get_analysis, redaction_manifest, restricted
 from app.config import settings
 from app.db import SessionLocal
-from app.models import Incident, Investigation, Evidence, Occurrence, ToolCall, Document, now
 from app.detectors import sanitize
-from app.analysis import get_analysis, restricted, case_for_analysis, capture_scope, redaction_manifest
+from app.models import Document, Evidence, Incident, Investigation, Occurrence, ToolCall, now
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
+from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 
 
 class Assessment(BaseModel):

@@ -48,8 +48,14 @@ with tempfile.TemporaryDirectory(prefix="leaklens-e2e-") as directory:
     # A local, non-network fixture exercises source editing and real Git scans.
     repo = Path(env["LOCAL_REPO_ROOT"]) / "browser-fixture"
     repo.mkdir(parents=True)
-    (repo / "fixture.txt").write_text("SYNTHETIC public browser fixture. No sensitive content.\n")
-    for args in (["init"], ["add", "fixture.txt"], ["commit", "-m", "Synthetic browser fixture"]):
+    (repo / "fixture.txt").write_text(
+        "SYNTHETIC public browser fixture. No sensitive content.\n"
+    )
+    for args in (
+        ["init"],
+        ["add", "fixture.txt"],
+        ["commit", "-m", "Synthetic browser fixture"],
+    ):
         subprocess.run(
             [
                 "git",

@@ -1,6 +1,6 @@
 """Shared database record serialization and bounded list queries."""
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 
 def record(row, exclude=()):

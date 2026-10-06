@@ -1,13 +1,14 @@
 import socket
 from types import SimpleNamespace
+
 import pytest
-from app.connectors.policy import validate_url, AccessDenied, local_repository
-from app.detectors import detect, safe_text
-from app.attribution import attribute
-from app.correlation import shingles, similarity
 from app.agent.runner import validate_result
-from app.parsers import parse_file
+from app.attribution import attribute
 from app.config import settings
+from app.connectors.policy import AccessDenied, local_repository, validate_url
+from app.correlation import shingles, similarity
+from app.detectors import detect, safe_text
+from app.parsers import parse_file
 
 
 @pytest.mark.parametrize(

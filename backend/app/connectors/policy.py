@@ -1,8 +1,9 @@
 import ipaddress
 import posixpath
 import socket
-from urllib.parse import unquote, urlsplit, urlunsplit
 from pathlib import Path
+from urllib.parse import unquote, urlsplit, urlunsplit
+
 from app.config import settings
 
 

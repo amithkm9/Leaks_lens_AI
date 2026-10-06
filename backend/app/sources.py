@@ -1,9 +1,11 @@
 """Source lifecycle and scan provenance shared by API operations."""
 
 from copy import deepcopy
+
 from fastapi import HTTPException
 from sqlalchemy import select, update
-from app.models import Source, SourceEvent, ScanJob
+
+from app.models import ScanJob, Source, SourceEvent
 
 
 def snapshot(source):

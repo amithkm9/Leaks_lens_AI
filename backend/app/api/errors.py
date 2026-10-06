@@ -1,8 +1,8 @@
 """Consistent safe API errors, origin checks, and response headers."""
 
-from fastapi.responses import JSONResponse
 from app.config import settings
 from app.detectors import safe_text
+from fastapi.responses import JSONResponse
 
 
 async def security_headers(request, call_next):

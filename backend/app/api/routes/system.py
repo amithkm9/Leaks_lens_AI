@@ -1,13 +1,14 @@
-from fastapi import Depends, HTTPException
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session as DBSession
 from app.config import settings
 from app.db import get_db
 from app.models import (
+    Document,
+    DocumentAnalysis,
+    ScanJob,
     User,
 )
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -20,8 +21,12 @@ def health():
 @router.get("/ready")
 def ready(db: DBSession = Depends(get_db)):
     try:
-        db.execute(text("SELECT 1"))
-        db.execute(select(User.id).limit(1))
+        # A reachable database with only the old users table is not ready for
+        # the current API. Probe the columns required by the analysis workflow.
+        db.execute(select(User.id).limit(0))
+        db.execute(select(Document.analysis_revision).limit(0))
+        db.execute(select(DocumentAnalysis).limit(0))
+        db.execute(select(ScanJob.analysis_request).limit(0))
         if settings().job_mode == "rq":
             from redis import Redis
 

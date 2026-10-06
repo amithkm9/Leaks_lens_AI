@@ -1,11 +1,12 @@
 import json
 from types import SimpleNamespace
+
 import pytest
-from conftest import upload
 from app.agent import runner
-from app.db import SessionLocal
-from app.models import Investigation, Incident, Evidence
 from app.config import settings
+from app.db import SessionLocal
+from app.models import Evidence, Incident, Investigation
+from conftest import upload
 from sqlalchemy import select
 
 
@@ -18,7 +19,8 @@ class Block:
 
 
 @pytest.mark.parametrize(
-    "behavior", ["valid", "invalid_json", "fake_citation", "timeout", "unauthorized_tool", "timeout_after_tool"]
+    "behavior",
+    ["valid", "invalid_json", "fake_citation", "timeout", "unauthorized_tool", "timeout_after_tool"],
 )
 def test_graph_with_controlled_provider_and_real_mcp(client, monkeypatch, behavior):
     incident, _ = upload(

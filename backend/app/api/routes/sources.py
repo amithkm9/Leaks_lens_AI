@@ -1,25 +1,24 @@
 from typing import Literal
-from fastapi import Depends, HTTPException, Query
-from sqlalchemy.orm import Session as DBSession
+
+from app.api.schemas import (
+    SourceArchiveIn,
+    SourceIn,
+    SourceUpdate,
+)
 from app.config import settings
+from app.connectors.policy import local_repository, validate_url
 from app.db import get_db
+from app.detectors import safe_text
 from app.models import (
     Source,
     SourceEvent,
     now,
 )
 from app.security import current_user, scoped
-from app.api.schemas import (
-    SourceIn,
-    SourceUpdate,
-    SourceArchiveIn,
-)
-from app.connectors.policy import validate_url, local_repository
-from app.detectors import safe_text
-from app.sources import record_event, lock_source, require_current, require_active, require_idle
-
-from fastapi import APIRouter
-from app.serialization import record, page
+from app.serialization import page, record
+from app.sources import lock_source, record_event, require_active, require_current, require_idle
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["sources"])
 

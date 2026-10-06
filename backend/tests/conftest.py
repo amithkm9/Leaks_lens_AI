@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+
 import pytest
 
 TEMP = tempfile.TemporaryDirectory(prefix="leaklens-tests-")
@@ -15,11 +16,11 @@ os.environ.update(
     ALLOWED_ORIGIN="http://testserver",
     LOCAL_REPO_ROOT=str(ROOT / "repos"),
 )
-from app.db import Base, engine, SessionLocal  # noqa: E402
-from app.models import Workspace, User  # noqa: E402
-from app.security import passwords  # noqa: E402
 from app.api.main import app  # noqa: E402
 from app.api.routes.auth import login_attempts  # noqa: E402
+from app.db import Base, SessionLocal, engine  # noqa: E402
+from app.models import User, Workspace  # noqa: E402
+from app.security import passwords  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 

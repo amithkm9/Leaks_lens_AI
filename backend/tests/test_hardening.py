@@ -2,13 +2,6 @@ import json
 import socket
 
 import pytest
-from fastmcp import Client
-from pydantic import ValidationError
-from sqlalchemy import select
-from starlette.applications import Starlette
-from starlette.responses import JSONResponse
-from starlette.routing import Route
-
 from app.api.middleware import RequestBodyLimitMiddleware
 from app.config import Settings, settings
 from app.connectors.policy import AccessDenied, validate_url
@@ -16,6 +9,12 @@ from app.db import SessionLocal
 from app.detectors import detect, safe_text, sanitize
 from app.models import Incident
 from conftest import upload
+from fastmcp import Client
+from pydantic import ValidationError
+from sqlalchemy import select
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 
 def test_missing_account_still_checks_a_password_hash(client, monkeypatch):
@@ -58,9 +57,10 @@ def test_login_throttle_blocks_repeated_attempts():
 
 
 def test_failed_tls_handshake_closes_connection(monkeypatch):
-    from app.connectors import http
-    from urllib.parse import urlsplit
     from types import SimpleNamespace
+    from urllib.parse import urlsplit
+
+    from app.connectors import http
 
     closed = []
 

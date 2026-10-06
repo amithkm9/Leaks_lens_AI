@@ -2,12 +2,13 @@
 
 from copy import deepcopy
 from types import SimpleNamespace
-from sqlalchemy import select
-from app.models import Document, DocumentAnalysis, Evidence, Finding, Incident, now
-from app.detectors import detect, safe_text
-from app.parsers import parse_file
+
 from app.attribution import attribute, categorize
-from app.correlation import shingles, similarity, priority
+from app.correlation import priority, shingles, similarity
+from app.detectors import detect, safe_text
+from app.models import Document, DocumentAnalysis, Evidence, Finding, Incident, now
+from app.parsers import parse_file
+from sqlalchemy import String, cast, select
 
 
 def evidence_excerpt(text, line):
@@ -186,7 +187,17 @@ def analyze_document(db, job, item, document, manifest, profiles):
         incident.category, incident.priority, incident.status = category, policy["priority"], "open"
         incident.summary, incident.attribution, incident.policy = summary, attributions, policy
         incident.related, incident.updated_at = related, now()
-        # Current relationship candidates may grow independently; analysis snapshots remain immutable.
+        # Retire both sides of old current links before rebuilding candidates. The
+        # immutable analysis snapshots still retain their original relationship claims.
+        peers = db.scalars(
+            select(Incident).where(
+                Incident.workspace_id == job.workspace_id,
+                Incident.document_id != document.id,
+                cast(Incident.related, String).contains(document.id),
+            )
+        ).all()
+        for peer in peers:
+            peer.related = [r for r in peer.related if r["document_id"] != document.id]
         for link in related:
             peer = db.scalar(
                 select(Incident).where(

@@ -2,9 +2,11 @@ import argparse
 import getpass
 import os
 from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
+
 from app.db import SessionLocal
-from app.models import Workspace, User, ScanJob, Investigation, now
+from app.models import Investigation, ScanJob, User, Workspace, now
 from app.security import passwords
 
 

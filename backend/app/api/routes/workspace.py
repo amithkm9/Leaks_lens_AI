@@ -1,24 +1,22 @@
-from fastapi import Depends
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session as DBSession
-from app.config import settings
-from app.db import get_db
-from app.models import (
-    Organization,
-    Source,
-    ScanJob,
-    Document,
-    Incident,
-    EvaluationRun,
-)
-from app.security import current_user, scoped
 from app.api.schemas import (
     OrganizationIn,
 )
+from app.config import settings
+from app.db import get_db
 from app.detectors import availability
-
-from fastapi import APIRouter
-from app.serialization import record, page
+from app.models import (
+    Document,
+    EvaluationRun,
+    Incident,
+    Organization,
+    ScanJob,
+    Source,
+)
+from app.security import current_user, scoped
+from app.serialization import page, record
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session as DBSession
 
 router = APIRouter(prefix="/api", tags=["workspace"])
 

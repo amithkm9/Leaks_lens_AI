@@ -1,10 +1,11 @@
 import sys
 from pathlib import Path
+
 import pytest
-from fastmcp import Client
-from fastmcp.client.transports import StdioTransport
 from app.config import settings
 from conftest import upload
+from fastmcp import Client
+from fastmcp.client.transports import StdioTransport
 
 
 async def test_real_stdio_tools_redaction_and_scope(client, other_client):

@@ -1,15 +1,17 @@
 """Versioned detector results; content identity and analyst decisions stay separate."""
 
-from copy import deepcopy
-from functools import lru_cache
 import hashlib
 import importlib.metadata
 import json
-from pathlib import Path
 import shutil
 import subprocess
+from copy import deepcopy
+from functools import lru_cache
+from pathlib import Path
 from types import SimpleNamespace
+
 from sqlalchemy import select
+
 from app import attribution, correlation, detectors, parsers
 from app.config import settings
 from app.models import Document, DocumentAnalysis, Organization, Review
@@ -178,14 +180,26 @@ def review_state(db, incident, analysis):
 
 
 def guard_incident_list(db, result, workspace):
-    # Lists and dashboard previews must not bypass the history/export restrictions.
-    for item in result["items"]:
-        doc = db.scalar(
-            select(Document).where(Document.id == item["document_id"], Document.workspace_id == workspace)
+    # One bounded join replaces two extra queries per incident in queue/dashboard lists.
+    document_ids = [item["document_id"] for item in result["items"]]
+    if not document_ids:
+        return result
+    rows = db.execute(
+        select(Document, DocumentAnalysis)
+        .outerjoin(
+            DocumentAnalysis,
+            (DocumentAnalysis.document_id == Document.id)
+            & (DocumentAnalysis.revision == Document.analysis_revision)
+            & (DocumentAnalysis.workspace_id == Document.workspace_id),
         )
-        analysis = get_analysis(db, doc)
-        item["analysis_revision"] = doc.analysis_revision
-        item["analysis_restricted"] = restricted(analysis)
+        .where(Document.workspace_id == workspace, Document.id.in_(document_ids))
+    ).all()
+    analyses = {doc.id: (doc.analysis_revision, analysis) for doc, analysis in rows}
+    manifest = redaction_manifest()
+    for item in result["items"]:
+        revision, analysis = analyses.get(item["document_id"], (0, None))
+        item["analysis_revision"] = revision
+        item["analysis_restricted"] = restricted(analysis, manifest)
         if item["analysis_restricted"]:
             item.update(
                 summary="Analysis requires refresh before evidence can be displayed.",

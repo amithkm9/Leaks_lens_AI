@@ -1,9 +1,9 @@
 import pytest
-from sqlalchemy import select
 from app.db import SessionLocal
 from app.models import Source, User
 from app.workers.jobs import run_scan
 from conftest import upload
+from sqlalchemy import select
 
 
 @pytest.fixture

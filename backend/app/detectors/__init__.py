@@ -1,14 +1,15 @@
+import csv
 import hashlib
 import hmac
-import csv
-import io
 import importlib.metadata
+import io
 import json
 import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
 from app.config import settings
 
 CUSTOM_VERSION = "1.1"
@@ -151,9 +152,9 @@ def detect(text):
 
     try:
         from presidio_analyzer.predefined_recognizers import (
+            CreditCardRecognizer,
             EmailRecognizer,
             PhoneRecognizer,
-            CreditCardRecognizer,
         )
 
         version = importlib.metadata.version("presidio-analyzer")

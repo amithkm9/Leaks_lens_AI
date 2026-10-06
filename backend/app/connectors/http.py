@@ -4,10 +4,11 @@ import ssl
 import time
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urldefrag
+from urllib.parse import urldefrag, urljoin, urlsplit
+
 from app.config import settings
 from app.connectors import Collection, Item
-from app.connectors.policy import validate_url, AccessDenied
+from app.connectors.policy import AccessDenied, validate_url
 from app.detectors import safe_text
 from app.parsers import supported
 
