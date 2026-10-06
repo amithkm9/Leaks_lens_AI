@@ -1,30 +1,37 @@
 import { ArrowRight, Search, SlidersHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Pagination } from "../components/Pagination";
 import { Badge, Empty, ErrorMessage, Header, Loading } from "../components/ui";
 import { useData } from "../hooks/useData";
+import { useIncidentFilters } from "../hooks/useIncidentFilters";
 import { date, label } from "../lib/format";
 import type { Incident, Organization, Page } from "../types";
 
 export default function Incidents() {
-  const [q, setQ] = useState(""),
-    [priority, setPriority] = useState(""),
-    [status, setStatus] = useState(""),
-    [category, setCategory] = useState(""),
-    [organization, setOrganization] = useState(""),
-    [since, setSince] = useState(""),
-    [offset, setOffset] = useState(0);
-  const orgs = useData<Page<Organization>>("/organizations");
-  const params = new URLSearchParams({
+  const {
     q,
     priority,
     status,
     category,
     organization,
     since,
-    offset: String(offset),
-  });
-  const { data, error } = useData<Page<Incident>>(`/incidents?${params}`, 5000);
+    offset,
+    query,
+    setFilter,
+    setOffset,
+    clear,
+    queuePath,
+  } = useIncidentFilters();
+  const orgs = useData<Page<Organization>>("/organizations");
+  const { data, error } = useData<Page<Incident>>(`/incidents?${query}`, 5000);
+  useEffect(() => {
+    if (data && offset >= data.total && offset > 0)
+      setOffset(
+        Math.max(0, Math.ceil(data.total / data.limit) - 1) * data.limit,
+        true,
+      );
+  }, [data, offset, setOffset]);
   return (
     <>
       <Header
@@ -41,8 +48,7 @@ export default function Incidents() {
             placeholder="Search incidents…"
             value={q}
             onChange={(e) => {
-              setQ(e.target.value);
-              setOffset(0);
+              setFilter("q", e.target.value);
             }}
           />
         </div>
@@ -51,8 +57,7 @@ export default function Incidents() {
           aria-label="Priority filter"
           value={priority}
           onChange={(e) => {
-            setPriority(e.target.value);
-            setOffset(0);
+            setFilter("priority", e.target.value);
           }}
         >
           <option value="">All priorities</option>
@@ -64,12 +69,12 @@ export default function Incidents() {
           aria-label="Status filter"
           value={status}
           onChange={(e) => {
-            setStatus(e.target.value);
-            setOffset(0);
+            setFilter("status", e.target.value);
           }}
         >
           <option value="">All statuses</option>
           {[
+            "active",
             "open",
             "confirmed",
             "needs_context",
@@ -85,8 +90,7 @@ export default function Incidents() {
           aria-label="Organization filter"
           value={organization}
           onChange={(e) => {
-            setOrganization(e.target.value);
-            setOffset(0);
+            setFilter("organization", e.target.value);
           }}
         >
           <option value="">All organizations</option>
@@ -100,8 +104,7 @@ export default function Incidents() {
           aria-label="Category filter"
           value={category}
           onChange={(e) => {
-            setCategory(e.target.value);
-            setOffset(0);
+            setFilter("category", e.target.value);
           }}
         >
           <option value="">All categories</option>
@@ -109,6 +112,7 @@ export default function Incidents() {
             "configuration",
             "customer_export",
             "internal_operational",
+            "public_material",
             "unknown",
           ].map((v) => (
             <option key={v} value={v}>
@@ -121,12 +125,16 @@ export default function Incidents() {
           type="date"
           value={since}
           onChange={(e) => {
-            setSince(e.target.value);
-            setOffset(0);
+            setFilter("since", e.target.value);
           }}
         />
       </div>
-      <ErrorMessage message={error} />
+      {(q || priority || status || category || organization || since) && (
+        <button className="text-button" onClick={clear}>
+          Clear filters
+        </button>
+      )}
+      <ErrorMessage message={error || orgs.error} />
       <section className="panel">
         {!data ? (
           <Loading />
@@ -153,7 +161,7 @@ export default function Incidents() {
                   {data.items.map((i) => (
                     <tr key={i.id}>
                       <td>
-                        <Link to={`/incidents/${i.id}`}>
+                        <Link to={`/incidents/${i.id}`} state={{ queuePath }}>
                           <strong>{i.title}</strong>
                         </Link>
                         <small>{label(i.category)}</small>
@@ -181,6 +189,7 @@ export default function Incidents() {
                         <Link
                           aria-label={`Open ${i.title}`}
                           to={`/incidents/${i.id}`}
+                          state={{ queuePath }}
                         >
                           <ArrowRight size={18} />
                         </Link>
@@ -190,29 +199,14 @@ export default function Incidents() {
                 </tbody>
               </table>
             </div>
-            <div className="pagination">
-              <span>
-                {offset + 1}–{Math.min(offset + 25, data.total)} of {data.total}
-              </span>
-              <div>
-                <button
-                  className="secondary small-button"
-                  disabled={!offset}
-                  onClick={() => setOffset(Math.max(0, offset - 25))}
-                >
-                  Previous
-                </button>
-                <button
-                  className="secondary small-button"
-                  disabled={offset + 25 >= data.total}
-                  onClick={() => setOffset(offset + 25)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
           </>
         )}
+        <Pagination
+          data={data}
+          offset={offset}
+          onChange={setOffset}
+          label="incidents"
+        />
       </section>
     </>
   );

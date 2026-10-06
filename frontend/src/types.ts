@@ -105,6 +105,7 @@ export type Occurrence = {
   last_observed: string;
 };
 export type Investigation = {
+  restricted: boolean;
   id: string;
   mode: string;
   status: string;
@@ -187,4 +188,35 @@ export type Page<T> = {
   total: number;
   offset: number;
   limit: number;
+};
+
+export type AnalysisComparison = {
+  document_id: string;
+  from_analysis: Analysis;
+  to_analysis: Analysis;
+  changed_inputs: string[];
+  category: { before: string; after: string };
+  policy_priority: { before: string; after: string };
+  organizations: Record<
+    "before" | "after",
+    { id: string; name: string; assessment: string }[]
+  >;
+  findings: {
+    added_count: number;
+    removed_count: number;
+    unchanged_count: number;
+    added: ChangedFinding[];
+    removed: ChangedFinding[];
+    complete: boolean;
+  };
+  text: { changed: boolean; lines: string[]; complete: boolean };
+  note: string;
+};
+export type ChangedFinding = {
+  id: string;
+  evidence_id: string;
+  finding_type: string;
+  detector: string;
+  line: number | null;
+  analysis_revision: number;
 };

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { post } from "../api";
-import { useData } from "../hooks/useData";
+import { isActiveJob, useData } from "../hooks/useData";
 import { date } from "../lib/format";
 import type { Detail, Job } from "../types";
 import { Badge, Button, ErrorMessage } from "./ui";
@@ -20,7 +20,10 @@ export function AnalysisPanel({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [jobId, setJobId] = useState("");
-  const job = useData<Job>(jobId ? `/scans/${jobId}` : "", 2500);
+  const job = useData<Job>(jobId ? `/scans/${jobId}` : "", {
+    interval: 2500,
+    while: isActiveJob,
+  });
   const sources = [
     ...new Map(
       data.occurrences

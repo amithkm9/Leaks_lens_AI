@@ -1,40 +1,60 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 
-export function useData<T>(path: string, poll = 0) {
+type PollOptions<T> = { interval: number; while?: (value: T) => boolean };
+
+export function useData<T>(path: string, poll: number | PollOptions<T> = 0) {
+  const interval = typeof poll === "number" ? poll : poll.interval;
+  const condition = useRef(typeof poll === "number" ? undefined : poll.while);
+  condition.current = typeof poll === "number" ? undefined : poll.while;
   const [result, setResult] = useState<{ path: string; data: T } | null>(null);
   const [failure, setFailure] = useState<{
     path: string;
     message: string;
   } | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reload = useCallback(async () => {
+    clearTimeout(timer.current);
     controller.current?.abort();
     if (!path) return;
     const request = new AbortController();
     controller.current = request;
+    let value: T | undefined;
     try {
-      const data = await api<T>(path, { signal: request.signal });
+      value = await api<T>(path, { signal: request.signal });
       if (!request.signal.aborted) {
-        setResult({ path, data });
+        setResult({ path, data: value });
         setFailure(null);
       }
     } catch (e) {
       if (!request.signal.aborted)
         setFailure({ path, message: (e as Error).message });
+    } finally {
+      // Schedule after completion so a slow response is never repeatedly aborted
+      // by a shorter polling interval. Terminal jobs stop making requests.
+      if (
+        !request.signal.aborted &&
+        interval &&
+        (value === undefined || !condition.current || condition.current(value))
+      ) {
+        timer.current = setTimeout(() => void reload(), interval);
+      }
     }
-  }, [path]);
+  }, [path, interval]);
   useEffect(() => {
     void reload();
-    const timer = poll ? setInterval(reload, poll) : undefined;
     return () => {
       controller.current?.abort();
-      clearInterval(timer);
+      clearTimeout(timer.current);
     };
-  }, [reload, poll]);
+  }, [reload]);
   return {
     data: result?.path === path ? result.data : null,
     error: failure?.path === path ? failure.message : "",
     reload,
   };
 }
+
+export const isActiveJob = (value: { status: string }) =>
+  ["queued", "running"].includes(value.status);

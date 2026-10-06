@@ -8,8 +8,15 @@ import {
   Radar,
 } from "lucide-react";
 import React, { useState, type FormEvent } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { api, post } from "../api";
+import { AnalysisComparison } from "../components/AnalysisComparison";
+import { EvidenceList } from "../components/EvidenceList";
 import { AnalysisPanel } from "../components/AnalysisPanel";
 import {
   Badge,
@@ -27,6 +34,13 @@ import InvestigationResult from "../components/InvestigationResult";
 
 export default function IncidentDetail() {
   const { id } = useParams();
+  const location = useLocation();
+  const previousQueue = location.state?.queuePath;
+  const queuePath =
+    typeof previousQueue === "string" &&
+    /^\/incidents(?:\?|$)/.test(previousQueue)
+      ? previousQueue
+      : "/incidents";
   const [params, setParams] = useSearchParams();
   const revision = params.get("analysis_revision") || "";
   const { data, error, reload } = useData<Detail>(
@@ -98,7 +112,7 @@ export default function IncidentDetail() {
     readOnly || !data.analysis.current || data.analysis.restricted;
   return (
     <>
-      <Link className="back-link" to="/incidents">
+      <Link className="back-link" to={queuePath}>
         ← Incident queue
       </Link>
       <Header
@@ -140,6 +154,10 @@ export default function IncidentDetail() {
           setActionError("");
           setParams(value ? { analysis_revision: value } : {});
         }}
+      />
+      <AnalysisComparison
+        key={`${id}:${data.analysis_revision}`}
+        incident={data}
       />
       <div className="detail-layout">
         <div>
@@ -194,23 +212,10 @@ export default function IncidentDetail() {
               <h2>Redacted evidence</h2>
               <span className="small muted">Sensitive matches are masked</span>
             </div>
-            <div className="panel-body evidence-list">
-              {data.evidence.map((e, i) => (
-                <article
-                  id={`evidence-${e.id}`}
-                  className="evidence"
-                  key={e.id}
-                >
-                  <div>
-                    <span className="evidence-number">E{i + 1}</span>
-                    <strong>{label(e.kind)}</strong>
-                    <span className="muted small">Line {e.location.line}</span>
-                  </div>
-                  <pre>{e.excerpt}</pre>
-                  <small className="mono muted">{e.id}</small>
-                </article>
-              ))}
-            </div>
+            <EvidenceList
+              evidence={data.evidence}
+              restricted={data.analysis.restricted}
+            />
             <details className="panel-body">
               <summary>Full redacted document</summary>
               <pre className="document-text">{data.document.redacted_text}</pre>
@@ -354,7 +359,11 @@ export default function IncidentDetail() {
             <div className="panel-heading">
               <h2>Analyst decision</h2>
             </div>
-            <form className="panel-body" onSubmit={review}>
+            <form
+              key={`${id}:${data.analysis_revision}`}
+              className="panel-body"
+              onSubmit={review}
+            >
               <label>
                 Action
                 <select name="action">
@@ -433,7 +442,13 @@ export default function IncidentDetail() {
                 </p>
               )}
               {data.investigations.map((run) => (
-                <InvestigationResult key={run.id} id={run.id} />
+                <InvestigationResult
+                  key={run.id}
+                  run={run}
+                  evidenceNumbers={
+                    new Map(data.evidence.map((e, index) => [e.id, index + 1]))
+                  }
+                />
               ))}
             </div>
           </section>

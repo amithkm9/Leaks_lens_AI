@@ -75,6 +75,19 @@ test("organization → upload → scan → review → export → recheck", async
   await expect(
     page.getByText("No decisions recorded yet.", { exact: true }),
   ).toBeVisible();
+  await page.getByText("Compare analyses", { exact: true }).click();
+  const comparison = page.getByRole("region", { name: "Compare analyses" });
+  await expect(
+    comparison.getByText("Redacted text is unchanged.", { exact: true }),
+  ).toBeVisible();
+  await expect(comparison.locator(".comparison-counts")).toContainText(
+    "0 added",
+  );
+  await expect(comparison.locator(".comparison-counts")).toContainText(
+    "0 removed",
+  );
+  await expect(comparison).not.toContainText("synthetic-browser-secret-123456");
+
   await expect(page.getByText("LLM disabled", { exact: true })).toHaveCount(0);
   await page.getByLabel("Analysis revision", { exact: true }).selectOption("1");
   await expect(

@@ -1584,3 +1584,51 @@ footer {
     transition: none !important;
   }
 }
+
+.comparison-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 18px 0;
+}
+.comparison-counts strong {
+  font-size: 22px;
+  margin-right: 5px;
+}
+.analysis-diff {
+  overflow: auto;
+  max-height: 420px;
+  padding: 16px;
+  background: #f6f8f7;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.analysis-diff span {
+  display: block;
+}
+.diff-add {
+  color: #146344;
+  background: #e2f3e8;
+}
+.diff-remove {
+  color: #973c30;
+  background: #faece8;
+}
+
+.evidence-citations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.evidence-reference {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  scroll-margin-top: 24px;
+}
+.evidence-reference:target {
+  outline: 2px solid #258d72;
+  outline-offset: 4px;
+}
