@@ -1,4 +1,4 @@
-.PHONY: setup user dev test build evaluate e2e compose-up compose-user purge recover migrate
+.PHONY: setup user dev test build evaluate e2e screenshots compose-up compose-user purge recover migrate
 setup:
 	python3 scripts/setup.py
 	uv sync --project backend --python 3.12 --frozen
@@ -18,6 +18,8 @@ evaluate:
 	cd backend && PATH="$(CURDIR)/.data/bin:$$PATH" .venv/bin/python -m app.evaluation --split development
 e2e:
 	cd frontend && npm run test:e2e
+screenshots:
+	cd frontend && npm run screenshots
 compose-up:
 	docker compose up --build -d
 compose-user:
