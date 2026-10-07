@@ -24,6 +24,7 @@ Completed in this sprint:
 - [x] Add optimistic concurrency and append-only task history; preserve workspace isolation, read-only mode, and restricted-analysis redaction.
 - [x] Add a paginated, bookmarkable action queue and overdue/awaiting-verification overview links.
 - [x] Verify migrations, API boundaries, redaction, reanalysis behavior, and the complete browser workflow; document the resulting behavior.
+- [x] Add README product screenshots and feature explanations, explicitly requested on 2026-10-07. A reproducible capture command uses a disposable synthetic workspace.
 
 ## Existing foundations
 

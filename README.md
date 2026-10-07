@@ -4,7 +4,11 @@
 
 LeakLens detects suspected secrets and selected personal data, connects findings to organization evidence, and helps an analyst investigate, record a decision, and recheck the source. It runs without a paid AI key; a bounded AI investigation is optional.
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [Repository map](#repository-map) · [Verification](#verification) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Product tour](#product-tour) · [Architecture](#architecture) · [Repository map](#repository-map) · [Verification](#verification) · [Documentation](#documentation)
+
+![LeakLens overview showing three incidents, one high-priority case, two active remediation tasks, one overdue task, and one action awaiting verification](docs/images/overview.png)
+
+*The running application with synthetic data. The overview connects incident priority with overdue work and actions awaiting verification. All screenshots below use fictional organizations and nonfunctional fixture credentials.*
 
 ## The whole project in one picture
 
@@ -80,6 +84,60 @@ flowchart LR
 ```
 
 Use synthetic or explicitly authorized material. A scan with no findings produces no incident.
+
+## Product tour
+
+### Collect documents and keep source history
+
+Upload PDF, CSV, JSON, text, and code files, or configure an authorized Git/HTTP source. **Sources** shows collection health, scan coverage, and the configuration revision used for each scan. Search sources, adjust collection limits, reanalyze available originals, or archive a source while retaining its evidence and history.
+
+The example below shows three supplied files and completed scans. Uploads remain labeled **supplied**: their presence in the workspace does not establish public exposure.
+
+![Sources screen with three synthetic uploads, completed collection status, reanalysis and archive controls, and scan history](docs/images/sources.png)
+
+### Inspect the evidence behind an incident
+
+Open a case to see its priority, review status, analysis revision, and redacted excerpts with line numbers and citation anchors. Organization attribution exposes the matching names, domains, and reference IDs. Record a reason when confirming, dismissing, reopening, or changing the priority of a finding; export a redacted JSON report or print the case for review.
+
+![Incident detail showing a confirmed synthetic credential finding, masked evidence at line four, the analysis revision, analyst review form, and export controls](docs/images/incident-review.png)
+
+<details>
+<summary><strong>Find the next case in the incident queue</strong></summary>
+
+Filter by priority, status, organization, category, or discovery date. Search, filters, and pagination are kept in the URL so a bookmarked view survives refresh and returning from a case.
+
+![Incident queue showing three cases, organization associations, high and medium priorities, and open and confirmed review states](docs/images/incident-queue.png)
+
+</details>
+
+### Assign remediation and verify the action
+
+Create follow-up tasks directly from an incident, assign a workspace member, set a UTC due date, and attach supporting evidence. **Remediation** brings those tasks into one queue with active, overdue, blocked, completed, and awaiting-verification views. Use **Me** or **Unassigned** to narrow ownership; the overview links directly to work that needs attention.
+
+![Remediation queue showing an overdue credential rotation, a customer-export access review, and a completed action awaiting verification](docs/images/remediation.png)
+
+<details>
+<summary><strong>See the difference between completion and verification</strong></summary>
+
+Completion records the action taken. Verification separately captures the analyst's check, supporting notes, identity, and timestamp. Task history preserves each change and its reason. Neither step automatically closes the incident or proves that every copy has disappeared.
+
+![Completed remediation task with the action taken, analyst-recorded credential-revocation verification, supporting evidence link, and task-history control](docs/images/remediation-verification.png)
+
+</details>
+
+### Reanalyze and compare without losing earlier decisions
+
+When organization profiles or analysis inputs change, create a fresh analysis from the original bytes. Earlier evidence, reviews, investigations, and tasks remain attached to their own revision. **Compare analyses** shows added, removed, and unchanged findings alongside changed inputs, attribution, policy priority, and redacted text.
+
+In this example, marking the associated asset as critical changes the policy priority from **medium → high** while the original finding and redacted text remain unchanged. This comparison covers two analyses of the same content; comparison between different file versions is still planned.
+
+![Analysis comparison showing one unchanged finding, updated organization profiles, a medium-to-high policy priority change, and unchanged redacted text](docs/images/analysis-comparison.png)
+
+### Investigate with or without an AI provider
+
+Scanning, detection, redaction, attribution, and priority calculation run locally without a paid AI key. Run an **offline assessment** for a deterministic summary, or configure the optional live agent for a bounded investigation using six case-scoped read-only tools. Live results include tool activity, evidence citations, and recorded usage. See [where the AI fits](#where-the-ai-fits) for its limits and configuration; the screenshots use offline mode.
+
+Screenshots are generated from real API operations in a disposable workspace. To refresh them after UI changes, run `make screenshots`; see the [capture instructions](docs/images/README.md).
 
 ## Architecture
 
@@ -289,6 +347,7 @@ Leak_Lens_AI/
 | `make migrate` | Apply pending database migrations for local development |
 | `make build` | TypeScript and production frontend build |
 | `make e2e` | Chrome analyst journey against a fresh disposable database |
+| `make screenshots` | Regenerate the README product tour using a disposable workspace and synthetic inputs |
 | `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
 | `make evaluate` | Development benchmark; writes measured results |
 

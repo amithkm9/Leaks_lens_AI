@@ -1,6 +1,14 @@
 # Build progress
 
-Updated 2026-10-07. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+Updated 2026-10-07. The owner removed the original build prompt from the repository. README screenshots are now explicitly requested; public demo and presentation deliverables remain deferred.
+
+## README product tour (2026-10-07)
+
+- At the owner's explicit request, added seven screenshots of the running application and a feature walkthrough to README.md. This authorizes README visuals; the previously deferred public visitor environment, presentation deck, and CV/interview deliverables remain separate.
+- Added `make screenshots` and a dedicated Playwright capture workflow. It creates synthetic organizations/documents/tasks through the API in a disposable database, records an offline assessment and verification, and demonstrates a real profile-driven priority change across analysis revisions. Ordinary browser tests do not overwrite tracked images.
+- Captures cover overview, sources, incident queue, evidence review, remediation queue, recorded verification, and analysis comparison. Capture instructions and provenance are in `docs/images/README.md`; image sizes are kept below 150 KB each.
+- Verification: the final capture workflow passed in **8.9 seconds**, with no browser errors or horizontal overflow. Inspected all seven views and rechecked the Sources header after stabilizing its capture. All local documentation links resolve; the seven PNGs total **688 KiB**. Formatting and whitespace checks passed.
+- The feature release at `e9ecfff` passed both GitHub Actions jobs, including PostgreSQL upgrade/schema/rollback checks: [Verification run 37590177128](https://github.com/amithkm9/Leaks_lens_AI/actions/runs/37590177128).
 
 ## Remediation ownership and action queue (2026-10-07)
 
