@@ -1,5 +1,6 @@
 import {
   Activity,
+  ListTodo,
   Database,
   FileSearch,
   LayoutDashboard,
@@ -26,6 +27,7 @@ import IncidentDetail from "./pages/IncidentDetail";
 import Incidents from "./pages/Incidents";
 import Login from "./pages/Login";
 import Overview from "./pages/Overview";
+import Remediation from "./pages/Remediation";
 import SettingsPage from "./pages/SettingsPage";
 
 function ScrollToTop() {
@@ -82,6 +84,9 @@ export default function App() {
             <NavLink to="/sources">
               <Database size={18} /> Sources
             </NavLink>
+            <NavLink to="/remediation">
+              <ListTodo size={18} /> Remediation
+            </NavLink>
             <NavLink to="/evaluation">
               <Activity size={18} /> Evaluation
             </NavLink>
@@ -134,6 +139,7 @@ export default function App() {
               <Route path="/sources" element={<Sources />} />
               <Route path="/incidents" element={<Incidents />} />
               <Route path="/incidents/:id" element={<IncidentDetail />} />
+              <Route path="/remediation" element={<Remediation />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/evaluation" element={<Evaluation />} />
               <Route

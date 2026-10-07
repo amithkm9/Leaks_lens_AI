@@ -6,6 +6,43 @@ export type Organization = {
   reference_ids: string[];
   importance: string;
 };
+
+export type WorkspaceMember = { id: string; email: string };
+export type RemediationTask = {
+  id: string;
+  incident_id: string;
+  incident_title: string;
+  analysis_revision: number;
+  current_analysis_revision: number;
+  analysis_restricted: boolean;
+  title: string;
+  owner_id: string | null;
+  owner_email: string | null;
+  due_date: string | null;
+  status: "open" | "in_progress" | "blocked" | "completed" | "cancelled";
+  action_taken: string;
+  evidence_ids: string[];
+  verification_method:
+    | "credential_rotation"
+    | "source_removal"
+    | "other"
+    | null;
+  verification_notes: string;
+  verified_by: string | null;
+  verified_at: string | null;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+  overdue: boolean;
+};
+export type RemediationEvent = {
+  id: string;
+  created_at: string;
+  actor_email: string | null;
+  revision: number;
+  reason: string;
+  snapshot: Partial<RemediationTask>;
+};
 export type Source = {
   id: string;
   name: string;

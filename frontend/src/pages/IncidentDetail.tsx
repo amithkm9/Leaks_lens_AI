@@ -17,6 +17,7 @@ import {
 import { api, post } from "../api";
 import { AnalysisComparison } from "../components/AnalysisComparison";
 import { EvidenceList } from "../components/EvidenceList";
+import { RemediationPanel } from "../components/RemediationPanel";
 import { AnalysisPanel } from "../components/AnalysisPanel";
 import {
   Badge,
@@ -353,6 +354,11 @@ export default function IncidentDetail() {
               )}
             </div>
           </section>
+          <RemediationPanel
+            key={`${id}:${data.analysis_revision}`}
+            incident={data}
+            readOnly={readOnly}
+          />
         </div>
         <aside className="detail-aside">
           <section className="panel no-print">

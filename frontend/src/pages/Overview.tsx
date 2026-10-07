@@ -14,7 +14,8 @@ import { JobList } from "../components/JobList";
 import { Badge, Empty, ErrorMessage, Header, Loading } from "../components/ui";
 import { useData } from "../hooks/useData";
 import { date, label } from "../lib/format";
-import type { Incident, Job, Page } from "../types";
+import type { Incident, Job, Page, RemediationTask } from "../types";
+import { taskHref } from "./Remediation";
 
 export default function Overview() {
   const { data, error } = useData<{
@@ -26,6 +27,12 @@ export default function Overview() {
     mode: string;
     recent_scans: Job[];
     trend: { date: string; incidents: number }[];
+    remediation: {
+      active: number;
+      overdue: number;
+      awaiting_verification: number;
+      next_tasks: RemediationTask[];
+    };
   }>("/overview", 5000);
   const incidents = useData<Page<Incident>>(
     "/incidents?status=active&limit=4",
@@ -98,6 +105,54 @@ export default function Overview() {
               </div>
             ))}
           </div>
+          <section className="panel" aria-label="Remediation follow-up">
+            <div className="panel-heading">
+              <h2>Remediation follow-up</h2>
+              <Link to="/remediation">
+                View tasks <ArrowRight size={15} />
+              </Link>
+            </div>
+            <div className="task-metrics">
+              <Link to="/remediation">
+                <strong>{data.remediation.active}</strong>
+                <span>Active tasks</span>
+              </Link>
+              <Link
+                to="/remediation?state=overdue"
+                className={data.remediation.overdue ? "has-overdue" : ""}
+              >
+                <strong>{data.remediation.overdue}</strong>
+                <span>Overdue tasks</span>
+              </Link>
+              <Link to="/remediation?state=awaiting_verification">
+                <strong>{data.remediation.awaiting_verification}</strong>
+                <span>Awaiting verification</span>
+              </Link>
+            </div>
+            {data.remediation.next_tasks.length > 0 ? (
+              <div className="compact-incidents">
+                {data.remediation.next_tasks.map((task) => (
+                  <Link key={task.id} to={taskHref(task)}>
+                    <div>
+                      <strong>{task.title}</strong>
+                      <small>
+                        {task.owner_email || "Unassigned"} ·{" "}
+                        {task.due_date
+                          ? `Due ${task.due_date} (UTC)`
+                          : "No due date"}
+                      </small>
+                    </div>
+                    <Badge value={task.overdue ? "overdue" : task.status} />
+                    <ChevronRight size={16} />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="panel-body small muted">
+                No active tasks. Add follow-up work from an incident.
+              </p>
+            )}
+          </section>
           <div className="two-columns overview-columns">
             <section className="panel">
               <div className="panel-heading">
