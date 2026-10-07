@@ -2,6 +2,31 @@
 
 The owner asked to build the application and leave demonstration work for later. Synthetic verification fixtures are distinct from a presentation demo. The original build prompt was removed from the repository by the owner.
 
+## Feature sprint — 2026-10-07
+
+Prioritized after inspecting the current application. The first sprint closes the gap between finding an exposure and tracking the work needed to address it. Scheduled collection stays next, with durable job submission and collection limits as prerequisites.
+
+| Priority | Work | Why it matters | Acceptance |
+|---|---|---|---|
+| P0 | Remediation tasks and an action queue | Decisions need responsibility and deadlines to become actionable | Create a task on an analysis, assign a workspace member, set a UTC due date, track work/verification separately, and preserve an actor/reason audit trail |
+| P0 | Overdue work on the overview | Counts alone do not tell the analyst what to do next | Show active/overdue/unverified work, link to its evidence, and keep counts scoped to the workspace |
+| P1 | Opt-in recurring Git/HTTP scans | Returning to every source manually does not scale | Database-enforced claims, recoverable queue submission, pause/resume, clone quotas, and no duplicate runs after restart |
+| P1 | Recurrence and change inbox | A previously remediated finding can return without a distinct action item | Deduplicate unchanged observations; separate content changes, analysis changes, and collection failures; retain prior decisions |
+| P1 | Compare content versions at a source path | Existing comparison only covers analyses of identical bytes | Show added/removed findings across authorized source lineage, with redaction and coverage limits |
+| P1 | Evaluation v2 and relationship review | Shared templates currently produce weak similarity matches | Freeze new mixed-format labels/splits before tuning; measure exact identity, versions, shared secrets, and association separately |
+| P2 | Unified case timeline | Analysts jump between several histories | Combine scans, analyses, reviews, task events, and verification without implying that an unavailable source proves remediation |
+| P2 | Redacted SARIF and CI scanning | Bring findings into developer workflows | Stable identifiers/locations and explicit failures for incomplete scans; preserve source authorization |
+| P2 | Evidence-supported AI claims | Valid citation IDs alone do not establish correct claims | Independently score support, abstention, false reassurance, latency, and cost before adding case Q&A |
+
+Completed in this sprint:
+
+- [x] Add revision-scoped remediation tasks, workspace owner selection, due dates, action notes, evidence references, and explicit analyst verification.
+- [x] Add optimistic concurrency and append-only task history; preserve workspace isolation, read-only mode, and restricted-analysis redaction.
+- [x] Add a paginated, bookmarkable action queue and overdue/awaiting-verification overview links.
+- [x] Verify migrations, API boundaries, redaction, reanalysis behavior, and the complete browser workflow; document the resulting behavior.
+
+## Existing foundations
+
 - [x] 1. Foundation: configuration, relational schema, explicit migrations, login, workspace isolation, local and PostgreSQL/Redis Compose startup.
 - [x] 2. Detection slice: uploads, bounded parsing, local detectors, redaction, asynchronous jobs, persisted findings/evidence, coverage warnings.
 - [x] 3. Attribution/correlation: profiles, local Git and bounded history, authorized HTTP collection, remote Git implementation, HMAC identity, versions/occurrences, candidate links.
@@ -84,12 +109,13 @@ Acceptance: an unchanged repeat scan generates no duplicate alert; a newly obser
 
 ### 4. Complete remediation and investigation history
 
-- [ ] Add remediation tasks with an accountable owner, due date, action taken, supporting evidence, and verification status. Start with the existing workspace users; invitations/roles are a later team feature.
+- [x] Add remediation tasks with an accountable owner, due date, action taken, supporting evidence, and verification status. Start with the existing workspace users; invitations/roles are a later team feature.
 - [ ] Show a combined timeline of scans, content changes, investigations, reviews, and follow-up checks.
 - [x] Compare analysis revisions of the same content with added/removed/unchanged findings, attribution/policy differences, restricted-history guards, and bounded redacted text previews.
 - [ ] Extend comparison to different content versions at a source path; include source lineage and never reconstruct masked values.
 - [ ] Distinguish analyst-recorded remediation, source no longer observed, and credential rotation/revocation confirmation. Recurrence should create an explicit review event without silently overwriting the analyst's prior decision.
-- [ ] Add actionable overview metrics: aging unresolved incidents, overdue follow-ups, recurring findings, and source coverage/failures, with clear denominators.
+- [x] Add active/overdue task counts, awaiting-verification counts, deadline ordering, and direct follow-up links on the overview.
+- [ ] Extend overview metrics with aging unresolved incidents, recurring findings, and clearer source coverage/failure denominators.
 
 Acceptance: an analyst can document an action, recheck it, inspect the before/after evidence, and see a later recurrence in the same history. Every status transition has a timestamp, actor, and reason.
 
@@ -116,4 +142,4 @@ Acceptance: publish results against a new frozen test set with failure examples 
 
 The integration direction is supported by existing ecosystems: [Gitleaks supports baselines and SARIF reports](https://github.com/gitleaks/gitleaks), and [GitHub's SARIF ingestion uses stable rule IDs, paths, and fingerprints to track results](https://docs.github.com/en/code-security/reference/code-scanning/sarif-files/sarif-support). These are integration opportunities, not features already implemented in LeakLens. Remediation design should also retain the distinction between an alert's resolution and action on the credential itself; see [GitHub's alert-resolution guidance](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-secret-scanning-alerts/resolving-alerts).
 
-Source management, versioned analysis, analysis comparison, and the focused workflow/structure cleanup are implemented. Next: build opt-in scheduled monitoring with durable source claims and change events. Different-content comparison and remediation ownership remain later milestones. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.
+Source management, versioned analysis, analysis comparison, and the focused workflow/structure cleanup are implemented. Next: build opt-in scheduled monitoring with durable source claims and change events. Remediation ownership and the action queue are implemented. Different-content comparison remains a later milestone. Redesign the evaluation labels before tuning correlation. This sequence produces visible improvements while preserving the evidence model that makes the project useful.

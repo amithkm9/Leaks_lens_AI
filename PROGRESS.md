@@ -1,6 +1,16 @@
 # Build progress
 
-Updated 2026-10-06. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+Updated 2026-10-07. The owner removed the original build prompt from the repository and explicitly deferred demonstration work.
+
+## Remediation ownership and action queue (2026-10-07)
+
+- Reviewed the existing roadmap against current code and prioritized accountable follow-up work. Added the new sprint and acceptance criteria to TODO.md. Scheduled monitoring, durable submission, recurrence alerts, different-content comparison, and evaluation v2 remain next steps.
+- Added analysis-scoped remediation tasks: workspace member assignment, UTC due dates, open/in-progress/blocked/completed/cancelled states, action notes, and up to 20 validated evidence references. Completion requires an action; analyst verification separately records a method, supporting notes, actor, and timestamp. Neither completion nor verification changes the incident review status.
+- Added append-only task events and optimistic revision checks, workspace/owner/evidence authorization, whitespace validation, CSRF/read-only protections, and restricted-history guards. Historical tasks remain attached to their original analysis after reanalysis. Available historical tasks can still be updated; restricted tasks preserve metadata but cannot expose old text or accept updates.
+- Added a paginated Remediation queue with URL-based filters, assignment to me/unassigned, overdue work, and awaiting-verification views. Overview metrics link to the queue and show upcoming work by deadline. Incident controls include task creation/update, evidence anchors, and paginated audit history. Reports include a bounded task page with explicit pagination metadata.
+- Added migration `c74e129af803` and readiness probes. Populated migration tests verify preservation; downgrade refuses once task history exists. Created an integrity-checked private SQLite backup in ignored `.data/backups/`, migrated local development, and confirmed no schema drift. No deployed PostgreSQL database was changed.
+- Local verification: **106 backend tests passed, 1 opt-in live-provider test skipped**; **6 Chrome browser scenarios passed** (30.2 seconds). TypeScript/Vite build, Ruff, and whitespace checks passed. Inspected desktop/mobile task queue and incident screenshots. Browser tests use a disposable database and synthetic inputs. Follow-up targeted checks cover the final readiness and validation adjustments.
+- Scope limits: no automatic credential revocation, recurrence detection, scheduled collection, invitations, notifications, or role restrictions added. The owner picker shows the first 100 workspace members. Verification is an analyst assertion, not proof that every source copy disappeared. Independent provider/evaluation gates remain unchanged. GitHub CI results must be checked against the pushed revision separately.
 
 ## Structure cleanup and analyst workflow upgrade (2026-10-06)
 

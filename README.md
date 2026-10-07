@@ -37,6 +37,7 @@ flowchart TD
 | Inspect an incident | Redacted excerpts, line locations, attribution signals and priority reasons |
 | Investigate | Deterministic offline summary or optional live agent with observable tool calls |
 | Decide and follow up | Audited review history, priority overrides, redacted JSON, browser printing and manual rechecks |
+| Track remediation | Assign workspace members, set deadlines, record actions and verification, and find overdue work in a shared queue |
 
 ## Quick start
 
@@ -161,6 +162,16 @@ Content and secret identities use **HMAC-SHA256**. Similarity uses hashed shingl
 
 Incident search, filters, and pagination are stored in the URL. Bookmark a view or return from a detail page to the same queue. Search updates are debounced; invalid page offsets recover to an available page. Repeated excerpts share a display block while every evidence ID and citation anchor remains accessible. Finished AI assessments stop polling; slow requests finish before the next poll begins. A newly loaded analysis resets an unfinished review form so a draft decision is not silently carried to another revision.
 
+### Remediation work
+
+Open an incident and choose **Remediation tasks → Add task** to record follow-up work, an optional owner and due date, and supporting evidence. The **Remediation** screen offers active, overdue, blocked, completed, cancelled, and awaiting-verification views, with **Me** and **Unassigned** filters. Filters and pagination survive refresh. The overview links to active and overdue work and actions awaiting verification. Deadlines are calendar dates in **UTC**; a task becomes overdue on the following UTC day while it is open, in progress, or blocked.
+
+Completing a task requires recording the action taken. Verification is a separate analyst assertion: select credential rotation/revocation, removal from the checked source, or another check, and record supporting notes. Every change captures its actor, reason, timestamp, and full task state; stale edits are rejected. Reopening or cancelling a task clears its current verification while preserving earlier events. Task completion and verification leave the incident's review status unchanged.
+
+Tasks stay attached to the analysis that prompted them. Reanalysis does not carry completed work or verification into the new revision. Available historical tasks remain editable by selecting their analysis, and the queue flags when newer evidence exists. Restricted analyses hide task text and history snapshots and block task updates; create new work after reanalyzing the original bytes. Restricted task metadata still contributes to queue counts. Source observations, recorded actions, and credential revocation remain distinct evidence.
+
+The owner picker currently lists the first 100 workspace members; invitations and role management remain planned. Incident JSON reports include the latest task state for the selected analysis, with a bounded first page of 100 tasks and explicit `total`, `offset`, and `limit`. Use `/api/remediation-tasks` for further pages and `/api/remediation-tasks/{id}/history` for the paginated audit trail. Existing local installations need `make migrate` before restarting the updated app.
+
 ### Reanalysis and history
 
 Open an incident’s **Analysis revision** selector to inspect earlier evidence, reviews, and AI investigations. Choose **Reanalyze original document**, select an available authorized source, and record a reason. **Sources → Reanalyze** collects all available documents within that source’s limits, including documents with no previous findings. Compatible ordinary scans reuse results; changed analysis inputs automatically produce a fresh revision when original content is observed again.
@@ -237,6 +248,7 @@ Leak_Lens_AI/
 │   │   ├── analysis.py      # Analysis provenance, freshness, and revision scope
 │   │   ├── incidents.py     # Revision-aware reports and mutation guards
 │   │   ├── comparison.py    # Bounded analysis comparisons
+│   │   ├── remediation.py   # Task ownership, deadlines, verification and audit
 │   │   ├── scans.py         # Scan submission and queue failure handling
 │   │   ├── connectors/      # Authorized Git / HTTP collection and URL policy
 │   │   ├── parsers/         # Format extraction and subprocess limits
@@ -280,7 +292,7 @@ Leak_Lens_AI/
 | `make compose-test` | API + PostgreSQL + Redis worker smoke test in running Compose |
 | `make evaluate` | Development benchmark; writes measured results |
 
-**Recorded checks — 2026-10-06:** 99 backend tests passed, 1 opt-in live-provider test skipped, and 5 Chrome browser scenarios passed. TypeScript/build, Ruff (including import ordering), formatting, and whitespace checks passed. Coverage now includes analysis comparison boundaries, relationship retirement, bounded incident-list queries, readiness on an outdated schema, filter/history navigation, citation grouping, and slow/terminal request handling. CI and earlier audit/runtime records remain attributed to their actual runs in [PROGRESS.md](PROGRESS.md).
+**Recorded checks — 2026-10-07:** 106 backend tests passed, 1 opt-in live-provider test skipped, and 6 Chrome browser scenarios passed. TypeScript/build, Ruff (including import ordering), and whitespace checks passed. New coverage includes task ownership and evidence scope, completion/verification, stale edits, redaction, historical follow-up, UTC deadlines, migration preservation, readiness, and the complete desktop/mobile remediation workflow. CI and earlier audit/runtime records remain attributed to their actual runs in [PROGRESS.md](PROGRESS.md).
 
 Browser tests require installed Google Chrome and write verification screenshots to ignored `frontend/test-results/`. They use a disposable database, not the owner's workspace.
 
