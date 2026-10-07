@@ -1,5 +1,5 @@
 from app.analysis import get_analysis
-from app.db import SessionLocal, engine, get_db
+from app.db import Base, SessionLocal, engine, get_db
 from app.models import Document, Incident
 from conftest import upload
 from sqlalchemy import create_engine, event, text
@@ -67,6 +67,17 @@ def test_readiness_rejects_database_missing_analysis_migration(client, tmp_path)
         response = client.get("/api/ready")
         assert response.status_code == 503
         assert "OperationalError" not in response.text
+        # An installation with the analysis schema but no task migration must
+        # also fail readiness before the overview starts querying task tables.
+        Base.metadata.create_all(
+            temporary,
+            tables=[
+                table
+                for name, table in Base.metadata.tables.items()
+                if name not in {"remediation_tasks", "remediation_events"}
+            ],
+        )
+        assert client.get("/api/ready").status_code == 503
     finally:
         app.dependency_overrides.pop(get_db)
         temporary.dispose()

@@ -3,6 +3,8 @@ from app.db import get_db
 from app.models import (
     Document,
     DocumentAnalysis,
+    RemediationEvent,
+    RemediationTask,
     ScanJob,
     User,
 )
@@ -27,6 +29,8 @@ def ready(db: DBSession = Depends(get_db)):
         db.execute(select(Document.analysis_revision).limit(0))
         db.execute(select(DocumentAnalysis).limit(0))
         db.execute(select(ScanJob.analysis_request).limit(0))
+        db.execute(select(RemediationTask).limit(0))
+        db.execute(select(RemediationEvent).limit(0))
         if settings().job_mode == "rq":
             from redis import Redis
 

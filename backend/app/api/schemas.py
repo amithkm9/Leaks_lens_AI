@@ -1,4 +1,5 @@
 import re
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -100,3 +101,31 @@ class IncidentReanalysisIn(BaseModel):
     source_id: str
     expected_analysis_revision: int = Field(ge=1)
     reason: str = Field(min_length=3, max_length=1000)
+
+
+class RemediationCreate(BaseModel):
+    model_config = {"extra": "forbid", "str_strip_whitespace": True}
+    analysis_revision: int = Field(ge=1)
+    title: str = Field(min_length=3, max_length=200)
+    owner_id: str | None = Field(default=None, min_length=1, max_length=36)
+    due_date: date | None = None
+    evidence_ids: list[str] = Field(default_factory=list, max_length=20)
+
+
+class RemediationUpdate(RemediationCreate):
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=3000)
+    status: Literal["open", "in_progress", "blocked", "completed", "cancelled"]
+    action_taken: str = Field(default="", max_length=3000)
+    verification_method: Literal["credential_rotation", "source_removal", "other"] | None = None
+    verification_notes: str = Field(default="", max_length=3000)
+
+    @model_validator(mode="after")
+    def validate_completion(self):
+        if self.status == "completed" and len(self.action_taken) < 3:
+            raise ValueError("Record the action taken before completing a task")
+        if self.verification_method and (self.status != "completed" or len(self.verification_notes) < 3):
+            raise ValueError("Verification requires a completed task and supporting verification notes")
+        if not self.verification_method and self.verification_notes:
+            raise ValueError("Choose a verification method or clear the verification notes")
+        return self

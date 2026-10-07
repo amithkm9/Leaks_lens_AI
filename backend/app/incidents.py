@@ -20,9 +20,11 @@ from app.models import (
     Incident,
     Investigation,
     Occurrence,
+    RemediationTask,
     Review,
     Source,
 )
+from app.remediation import task_page
 from app.security import scoped
 from app.serialization import record
 
@@ -137,6 +139,16 @@ def incident_report(db, incident, workspace, revision=None):
             )
         ],
         "observation_scope": "Latest observations, independent of the selected analysis revision",
+        "remediation": task_page(
+            db,
+            workspace,
+            limit=100,
+            extra=[
+                RemediationTask.incident_id == incident.id,
+                RemediationTask.analysis_revision == analysis.revision,
+            ],
+        ),
+        "remediation_scope": "Latest task state for the selected analysis; analyst verification does not change incident status. Lists are paginated.",
         "versions": [
             record(v, ("locator_hash",))
             for v in db.scalars(

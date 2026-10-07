@@ -125,3 +125,66 @@ def test_source_lifecycle_migrates_existing_data(tmp_path):
     with engine.connect() as db:
         assert db.scalar(text("SELECT revision FROM document_analyses")) == 2
     engine.dispose()
+
+
+def test_remediation_migration_preserves_tasks_on_refused_downgrade(tmp_path):
+    from app.models import Document, Incident, RemediationEvent, RemediationTask, User, Workspace
+    from sqlalchemy.orm import Session
+
+    backend = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "DATABASE_URL": f"sqlite:///{tmp_path}/tasks.db", "DATA_DIR": str(tmp_path)}
+
+    def migrate(*args):
+        return subprocess.run(
+            [sys.executable, "-m", "alembic", *args], cwd=backend, env=env, capture_output=True, text=True
+        )
+
+    upgrade = migrate("upgrade", "head")
+    assert upgrade.returncode == 0, upgrade.stderr
+    engine = create_engine(env["DATABASE_URL"])
+    with Session(engine) as db:
+        workspace = Workspace(name="Migration test")
+        db.add(workspace)
+        db.flush()
+        user = User(workspace_id=workspace.id, email="migration@example.test", password_hash="unusable")
+        doc = Document(workspace_id=workspace.id, content_hash="synthetic", name="fixture.env")
+        db.add_all([user, doc])
+        db.flush()
+        incident = Incident(
+            workspace_id=workspace.id,
+            document_id=doc.id,
+            title="Fixture",
+            category="configuration",
+            priority="high",
+            summary="Synthetic case",
+        )
+        db.add(incident)
+        db.flush()
+        task = RemediationTask(
+            workspace_id=workspace.id,
+            incident_id=incident.id,
+            analysis_revision=1,
+            title="Rotate test credential",
+            owner_id=user.id,
+        )
+        db.add(task)
+        db.flush()
+        db.add(
+            RemediationEvent(
+                workspace_id=workspace.id,
+                task_id=task.id,
+                user_id=user.id,
+                revision=1,
+                reason="Created",
+                snapshot={"title": task.title},
+            )
+        )
+        db.commit()
+    check = migrate("check")
+    assert check.returncode == 0, check.stdout + check.stderr
+    refused = migrate("downgrade", "a821f47d62bc")
+    assert refused.returncode != 0 and "Remediation tasks exist" in refused.stderr
+    with engine.connect() as db:
+        assert db.scalar(text("SELECT COUNT(*) FROM remediation_tasks")) == 1
+        assert db.scalar(text("SELECT COUNT(*) FROM remediation_events")) == 1
+    engine.dispose()

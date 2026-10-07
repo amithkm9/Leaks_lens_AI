@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -105,6 +105,35 @@ class Document(Scoped, Base):
     shingles: Mapped[list] = mapped_column(JSON, default=list)
     analysis_revision: Mapped[int] = mapped_column(default=0, server_default="0")
     __table_args__ = (UniqueConstraint("workspace_id", "content_hash"),)
+
+
+class RemediationTask(Scoped, Base):
+    __tablename__ = "remediation_tasks"
+    incident_id: Mapped[str] = mapped_column(ForeignKey("incidents.id"), index=True)
+    analysis_revision: Mapped[int]
+    title: Mapped[str] = mapped_column(String(200))
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    due_date: Mapped[str | None] = mapped_column(String(10))
+    status: Mapped[str] = mapped_column(String(30), default="open")
+    action_taken: Mapped[str] = mapped_column(Text, default="")
+    evidence_ids: Mapped[list] = mapped_column(JSON, default=list)
+    verification_method: Mapped[str | None] = mapped_column(String(40))
+    verification_notes: Mapped[str] = mapped_column(Text, default="")
+    verified_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    verified_at: Mapped[str | None] = mapped_column(String(40))
+    revision: Mapped[int] = mapped_column(default=1)
+    updated_at: Mapped[str] = mapped_column(String(40), default=now)
+    __table_args__ = (Index("ix_remediation_tasks_queue", "workspace_id", "status", "due_date"),)
+
+
+class RemediationEvent(Scoped, Base):
+    __tablename__ = "remediation_events"
+    task_id: Mapped[str] = mapped_column(ForeignKey("remediation_tasks.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    revision: Mapped[int]
+    reason: Mapped[str] = mapped_column(Text)
+    snapshot: Mapped[dict] = mapped_column(JSON)
+    __table_args__ = (UniqueConstraint("task_id", "revision"),)
 
 
 class DocumentAnalysis(Scoped, Base):

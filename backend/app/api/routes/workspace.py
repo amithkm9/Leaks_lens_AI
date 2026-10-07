@@ -9,9 +9,11 @@ from app.models import (
     EvaluationRun,
     Incident,
     Organization,
+    RemediationTask,
     ScanJob,
     Source,
 )
+from app.remediation import ACTIVE, task_page, today
 from app.security import current_user, scoped
 from app.serialization import page, record
 from fastapi import APIRouter, Depends
@@ -69,6 +71,17 @@ def overview(user=Depends(current_user), db: DBSession = Depends(get_db)):
         "source_issues": count(
             Source, Source.archived_at.is_(None), Source.health.in_(["error", "partial", "failed"])
         ),
+        "remediation": {
+            "active": count(RemediationTask, RemediationTask.status.in_(ACTIVE)),
+            "overdue": count(
+                RemediationTask, RemediationTask.status.in_(ACTIVE), RemediationTask.due_date < today()
+            ),
+            "awaiting_verification": count(
+                RemediationTask, RemediationTask.status == "completed", RemediationTask.verified_at.is_(None)
+            ),
+            "next_tasks": task_page(db, w, limit=5, extra=[RemediationTask.status.in_(ACTIVE)])["items"],
+            "due_date_timezone": "UTC",
+        },
         "recent_scans": page(db, ScanJob, w, limit=5)["items"],
         "trend": [{"date": date, "incidents": n} for date, n in reversed(trend)],
         "mode": "Live agent available"

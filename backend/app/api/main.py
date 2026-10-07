@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from app.api.errors import security_headers, validation_error, value_error
 from app.api.middleware import RequestBodyLimitMiddleware
-from app.api.routes import auth, incidents, scans, sources, system, workspace
+from app.api.routes import auth, incidents, remediation, scans, sources, system, workspace
 from app.config import settings
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -29,5 +29,13 @@ app.add_middleware(RequestBodyLimitMiddleware)
 app.middleware("http")(security_headers)
 app.add_exception_handler(RequestValidationError, validation_error)
 app.add_exception_handler(ValueError, value_error)
-for router in (system.router, auth.router, workspace.router, sources.router, scans.router, incidents.router):
+for router in (
+    system.router,
+    auth.router,
+    workspace.router,
+    sources.router,
+    scans.router,
+    incidents.router,
+    remediation.router,
+):
     app.include_router(router)
